@@ -1,0 +1,333 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.app__header {
+  padding: 14px 16px 10px;
+}
+.app__header h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.2px;
+}
+.app__mark {
+  color: var(--sun);
+}
+.app__tag {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.app__body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+.app__panel {
+  padding: 12px 16px 24px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+
+.app__map {
+  position: relative;
+  min-height: 320px;
+}
+
+.app__error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.app__notice {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #1e293b;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.app__notice code {
+  color: var(--text);
+}
+
+/* ---------- form ---------- */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form__field label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+.form__inline {
+  display: flex;
+  gap: 8px;
+}
+.form__inline > :first-child,
+.form__field .pac-target-input {
+  flex: 1;
+}
+.form input {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+}
+.form input:focus {
+  border-color: var(--accent);
+}
+.form__ghost {
+  padding: 0 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.form__ghost:hover {
+  border-color: var(--accent);
+}
+
+.form__weights {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form__weights legend {
+  padding: 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+.weight__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.weight__val {
+  color: var(--text-dim);
+}
+.weight input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.weight__hint {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.form__submit {
+  padding: 13px;
+  background: var(--accent);
+  color: #052e16;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+}
+.form__submit:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- route list ---------- */
+.routes {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.route {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--route-color, var(--border));
+  border-radius: 12px;
+  padding: 12px;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.route--selected {
+  border-color: var(--route-color);
+  box-shadow: 0 0 0 1px var(--route-color);
+}
+.route__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.route__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--route-color);
+}
+.route__name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+}
+.route__score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--route-color);
+}
+.route__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+.stat__label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+.stat__value {
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.route__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ---------- map ---------- */
+.map,
+.map__canvas {
+  width: 100%;
+  height: 100%;
+}
+.map--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+/* ---------- weather ---------- */
+.weather {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.weather__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.weather__glyph {
+  font-size: 18px;
+}
+.weather__dim {
+  color: var(--text-dim);
+}
+.weather__advice {
+  color: var(--sun);
+  font-size: 12px;
+}
+.weather__strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+}
+.wstep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 52px;
+  font-size: 12px;
+}
+.wstep__time {
+  color: var(--text-dim);
+  font-size: 10.5px;
+}
+.wstep__pop {
+  color: #7dd3fc;
+  font-size: 10.5px;
+}
+
+/* ---------- fatal ---------- */
+.app--fatal {
+  align-items: center;
+  justify-content: center;
+}
+.fatal {
+  max-width: 440px;
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+}
+.fatal h1 {
+  font-size: 18px;
+}
+.fatal p {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------- responsive / phone ---------- */
+@media (max-width: 780px) {
+  .app__body {
+    grid-template-columns: 1fr;
+  }
+  .app__panel {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 62vh;
+  }
+  .app__map {
+    min-height: 42vh;
+  }
+}
+
+/* Keep Google's autocomplete dropdown above everything */
+.pac-container {
+  z-index: 9999;
+}

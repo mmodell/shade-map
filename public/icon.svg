@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Shade Map">
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <circle cx="336" cy="176" r="72" fill="#fcd34d"/>
+  <g fill="none" stroke="#fcd34d" stroke-width="18" stroke-linecap="round">
+    <path d="M336 60v-34"/>
+    <path d="M336 326v-34"/>
+    <path d="M446 176h34"/>
+    <path d="M192 176h34"/>
+    <path d="M414 98l24-24"/>
+    <path d="M234 254l24-24"/>
+    <path d="M414 254l24 24"/>
+    <path d="M234 98l24 24"/>
+  </g>
+  <path d="M96 300c96-40 152 40 240 8 40-14 64-8 80 2v130c-14 10-44 18-84 4-92-32-140 44-236 6z" fill="#22c55e"/>
+  <path d="M96 348c96-40 152 40 240 8 40-14 64-8 80 2" fill="none" stroke="#0f172a" stroke-width="14" stroke-linecap="round" opacity="0.35"/>
+  <g stroke="#e2e8f0" stroke-width="16" stroke-linecap="round" stroke-dasharray="4 34">
+    <path d="M120 420c110-52 176 28 268-8" fill="none"/>
+  </g>
+</svg>

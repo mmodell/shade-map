@@ -1,0 +1,19 @@
+{
+  "name": "Shade Map",
+  "short_name": "Shade Map",
+  "description": "Walking routes ranked by shade, comfort and safety.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

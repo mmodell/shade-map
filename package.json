@@ -1,0 +1,27 @@
+{
+  "name": "shade-map",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shade Map — walking routes ranked by how shaded, comfortable and safe they are.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:full": "vercel dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-google-maps/api": "^2.20.3",
+    "date-fns": "^3.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "suncalc": "^1.9.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8"
+  }
+}
