@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Autocomplete } from '@react-google-maps/api'
+import { useState } from 'react'
+import PlaceField from './PlaceField'
 
 const WEIGHT_FIELDS = [
   { key: 'shade', label: 'Shade', hint: 'Prefer tree cover & shadow' },
@@ -16,86 +16,98 @@ export default function RouteForm({
   status,
   onSubmit,
 }) {
-  const [origin, setOrigin] = useState('')
-  const [destination, setDestination] = useState('')
+  const [origin, setOrigin] = useState(null) // { text, location }
+  const [destination, setDestination] = useState(null)
+  const [geoOrigin, setGeoOrigin] = useState(null) // { lat, lng } from the ◎ button
   const [locating, setLocating] = useState(false)
-  const originAc = useRef(null)
-  const destAc = useRef(null)
+  const [error, setError] = useState('')
 
   const busy = status === 'loading'
 
   function handleSubmit(e) {
     e.preventDefault()
-    onSubmit({ origin: origin.trim(), destination: destination.trim() })
+    const originValue = geoOrigin || origin?.location || origin?.text
+    const destValue = destination?.location || destination?.text
+    if (!originValue || !destValue) {
+      setError('Pick a start point and a destination from the suggestions.')
+      return
+    }
+    setError('')
+    onSubmit({ origin: originValue, destination: destValue })
   }
 
   function useMyLocation() {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation) {
+      setError('This device has no location access.')
+      return
+    }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setOrigin(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`)
+        setGeoOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude })
         setLocating(false)
+        setError('')
       },
-      () => setLocating(false),
+      () => {
+        setLocating(false)
+        setError('Could not get your location.')
+      },
       { enableHighAccuracy: true, timeout: 8000 }
     )
   }
 
-  function bindPlace(acRef, setter) {
-    const place = acRef.current?.getPlace?.()
-    if (place?.formatted_address) setter(place.formatted_address)
-    else if (place?.name) setter(place.name)
-  }
+  const locationButton = (
+    <button
+      type="button"
+      className="form__ghost"
+      onClick={useMyLocation}
+      disabled={locating}
+      title="Use my current location"
+    >
+      {locating ? '…' : '◎'}
+    </button>
+  )
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <div className="form__field">
-        <label htmlFor="origin">From</label>
-        <div className="form__inline">
-          <MaybeAutocomplete
-            isLoaded={isLoaded}
-            onLoad={(ac) => (originAc.current = ac)}
-            onPlaceChanged={() => bindPlace(originAc, setOrigin)}
-          >
-            <input
-              id="origin"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              placeholder="Address or place"
-              autoComplete="off"
-              required
-            />
-          </MaybeAutocomplete>
-          <button
-            type="button"
-            className="form__ghost"
-            onClick={useMyLocation}
-            disabled={locating}
-            title="Use my current location"
-          >
-            {locating ? '…' : '◎'}
-          </button>
+      {geoOrigin ? (
+        <div className="form__field">
+          <label>From</label>
+          <div className="form__inline">
+            <span className="pac-chip">
+              📍 Current location
+              <button
+                type="button"
+                aria-label="Clear current location"
+                onClick={() => setGeoOrigin(null)}
+              >
+                ✕
+              </button>
+            </span>
+          </div>
         </div>
-      </div>
+      ) : isLoaded ? (
+        <PlaceField
+          id="origin"
+          label="From"
+          placeholder="Address or place"
+          onSelect={setOrigin}
+          trailing={locationButton}
+        />
+      ) : (
+        <LoadingField label="From" trailing={locationButton} />
+      )}
 
-      <div className="form__field">
-        <label htmlFor="destination">To</label>
-        <MaybeAutocomplete
-          isLoaded={isLoaded}
-          onLoad={(ac) => (destAc.current = ac)}
-          onPlaceChanged={() => bindPlace(destAc, setDestination)}
-        >
-          <input
-            id="destination"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder="Address or place"
-            autoComplete="off"
-            required
-          />
-        </MaybeAutocomplete>
-      </div>
+      {isLoaded ? (
+        <PlaceField
+          id="destination"
+          label="To"
+          placeholder="Address or place"
+          onSelect={setDestination}
+        />
+      ) : (
+        <LoadingField label="To" />
+      )}
 
       <div className="form__field">
         <label htmlFor="departure">Leaving at</label>
@@ -140,6 +152,8 @@ export default function RouteForm({
         ))}
       </fieldset>
 
+      {error && <p className="form__err">{error}</p>}
+
       <button className="form__submit" type="submit" disabled={busy || !isLoaded}>
         {busy ? 'Finding shade…' : 'Find routes'}
       </button>
@@ -147,16 +161,15 @@ export default function RouteForm({
   )
 }
 
-function MaybeAutocomplete({ isLoaded, onLoad, onPlaceChanged, children }) {
-  if (!isLoaded) return children
+function LoadingField({ label, trailing }) {
   return (
-    <Autocomplete
-      onLoad={onLoad}
-      onPlaceChanged={onPlaceChanged}
-      fields={['formatted_address', 'name', 'geometry']}
-    >
-      {children}
-    </Autocomplete>
+    <div className="form__field">
+      <label>{label}</label>
+      <div className="form__inline">
+        <input disabled placeholder="Loading maps…" />
+        {trailing}
+      </div>
+    </div>
   )
 }
 
