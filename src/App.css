@@ -23,6 +23,17 @@
   font-size: 13px;
 }
 
+/* Compact mode: after routes are found, shrink chrome so the map dominates. */
+.app--compact .app__header {
+  padding: 8px 16px 6px;
+}
+.app--compact .app__header h1 {
+  font-size: 16px;
+}
+.app--compact .app__tag {
+  display: none;
+}
+
 .app__body {
   flex: 1;
   display: grid;
@@ -58,6 +69,72 @@
 }
 .app__notice code {
   color: var(--text);
+}
+
+/* ---------- travel mode ---------- */
+.modes {
+  display: flex;
+  gap: 6px;
+}
+.modes__btn {
+  flex: 1;
+  padding: 9px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.modes__btn--on {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ---------- collapsed trip bar ---------- */
+.tripbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: inherit;
+  text-align: left;
+}
+.tripbar__mode {
+  font-size: 16px;
+}
+.tripbar__route {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.tripbar__pt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42%;
+}
+.tripbar__arrow {
+  color: var(--text-dim);
+  flex: none;
+}
+.tripbar__time {
+  color: var(--text-dim);
+  font-size: 12px;
+  flex: none;
+}
+.tripbar__edit {
+  flex: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* ---------- form ---------- */
@@ -147,21 +224,39 @@
   font-size: 12.5px;
 }
 
-.form__weights {
+.form__weights-wrap {
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+.form__weights-wrap > summary {
+  padding: 11px 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.form__weights-sum {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.form__weights-wrap[open] .form__weights-sum {
+  display: none;
+}
+.form__weights {
+  border: none;
+  border-top: 1px solid var(--border);
   padding: 12px;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.form__weights legend {
-  padding: 0 6px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-dim);
 }
 .weight__row {
   display: flex;
@@ -241,7 +336,7 @@
 }
 .route__stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
 }
 .stat {
@@ -262,6 +357,56 @@
   margin: 0;
   font-size: 12px;
   color: var(--text-dim);
+}
+
+/* ---------- turn-by-turn ---------- */
+.steps {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+.steps > summary {
+  padding: 11px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.steps__count {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.steps__list {
+  margin: 0;
+  padding: 4px 12px 12px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.steps__item {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.steps__num {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  padding-top: 1px;
+}
+.steps__dist {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- map ---------- */
@@ -309,6 +454,14 @@
   color: var(--sun);
   font-size: 12px;
 }
+.weather__uv {
+  font-size: 12px;
+  font-weight: 600;
+}
+.wstep__uv {
+  font-size: 10px;
+  font-weight: 600;
+}
 .weather__strip {
   display: flex;
   gap: 10px;
@@ -354,15 +507,25 @@
 /* ---------- responsive / phone ---------- */
 @media (max-width: 780px) {
   .app__body {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
   }
   .app__panel {
     border-right: none;
     border-bottom: 1px solid var(--border);
-    max-height: 62vh;
+    max-height: 58vh;
+    flex: none;
   }
   .app__map {
-    min-height: 42vh;
+    flex: 1;
+    min-height: 38vh;
+  }
+  /* Form collapsed → hand most of the screen to the map. */
+  .app--compact .app__panel {
+    max-height: 40vh;
+  }
+  .app--compact .app__map {
+    min-height: 55vh;
   }
 }
 

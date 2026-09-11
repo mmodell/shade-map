@@ -1,5 +1,6 @@
 import { rankColor } from '../lib/ranking'
 import { formatDistance, formatDuration, formatPercent } from '../lib/format'
+import { uvCategory } from '../lib/uv'
 
 export default function RouteList({ routes, selectedId, onSelect }) {
   return (
@@ -27,6 +28,15 @@ export default function RouteList({ routes, selectedId, onSelect }) {
                 <Stat label="Distance" value={formatDistance(r.distanceMeters)} />
                 <Stat label="Time" value={formatDuration(r.durationSeconds)} />
                 <Stat
+                  label="UV"
+                  value={
+                    night || r.shade?.uvIndex == null
+                      ? '—'
+                      : `${r.shade.uvIndex}`
+                  }
+                  color={night ? undefined : uvCategory(r.shade?.uvIndex).color}
+                />
+                <Stat
                   label="Safety"
                   value={r.safety?.score != null ? formatPercent(r.safety.score) : '—'}
                 />
@@ -35,8 +45,8 @@ export default function RouteList({ routes, selectedId, onSelect }) {
               {r.shade?.note && <p className="route__note">{r.shade.note}</p>}
               {!r.shade?.note && r.shade?.greenCoverage != null && (
                 <p className="route__note">
-                  {formatPercent(r.shade.greenCoverage)} of this route runs past parks, trees or
-                  greenway. Sun {Math.round(r.shade.sunAltitude)}° up.
+                  {formatPercent(r.shade.greenCoverage)} runs past parks, trees or greenway
+                  {r.shade?.sunAltitude != null && ` · sun ${Math.round(r.shade.sunAltitude)}° up`}
                 </p>
               )}
             </button>
@@ -47,11 +57,13 @@ export default function RouteList({ routes, selectedId, onSelect }) {
   )
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, color }) {
   return (
     <div className="stat">
       <span className="stat__label">{label}</span>
-      <span className="stat__value">{value}</span>
+      <span className="stat__value" style={color ? { color } : undefined}>
+        {value}
+      </span>
     </div>
   )
 }

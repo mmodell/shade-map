@@ -1,25 +1,33 @@
-/* Thin wrapper around google.maps.DirectionsService for WALKING routes,
-   plus helpers to turn an overview path into an evenly sampled point list. */
+/* Thin wrapper around google.maps.DirectionsService, plus helpers to turn an
+   overview path into an evenly sampled point list and to pull out turn-by-turn
+   steps. */
 
-export function requestWalkingRoutes({ origin, destination }) {
+export const TRAVEL_MODES = [
+  { id: 'WALKING', label: 'Walk', glyph: '🚶' },
+  { id: 'BICYCLING', label: 'Bike', glyph: '🚴' },
+  { id: 'DRIVING', label: 'Drive', glyph: '🚗' },
+]
+
+export function requestRoutes({ origin, destination, mode = 'WALKING' }) {
   return new Promise((resolve, reject) => {
     if (!window.google?.maps) {
       reject(new Error('Google Maps is not loaded yet.'))
       return
     }
+    const travelMode = window.google.maps.TravelMode[mode] || window.google.maps.TravelMode.WALKING
     const service = new window.google.maps.DirectionsService()
     service.route(
       {
         origin,
         destination,
-        travelMode: window.google.maps.TravelMode.WALKING,
+        travelMode,
         provideRouteAlternatives: true,
       },
       (result, status) => {
         if (status === 'OK' && result?.routes?.length) {
           resolve(result)
         } else if (status === 'ZERO_RESULTS') {
-          reject(new Error('No walking route found between those points.'))
+          reject(new Error('No route found between those points for that mode.'))
         } else {
           reject(new Error(`Directions request failed (${status}).`))
         }
@@ -72,5 +80,30 @@ export function routeSummary(route) {
     startAddress: leg?.start_address,
     endAddress: leg?.end_address,
     summary: route.summary,
+    steps: routeSteps(route),
   }
+}
+
+/* Flatten Google's per-leg steps into a plain turn-by-turn list.
+   `instructions` is HTML from Google — we reduce it to text to render safely. */
+export function routeSteps(route) {
+  const out = []
+  for (const leg of route.legs || []) {
+    for (const s of leg.steps || []) {
+      out.push({
+        text: stripHtml(s.instructions || ''),
+        distance: s.distance?.text || '',
+        maneuver: s.maneuver || '',
+      })
+    }
+  }
+  return out
+}
+
+function stripHtml(html) {
+  if (typeof document !== 'undefined') {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
+  }
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }

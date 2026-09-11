@@ -1,4 +1,5 @@
 import SunCalc from 'suncalc'
+import { estimateUvIndex } from './uv'
 
 /* Rough client-only shade estimate used when the /api/route function is not
    available (e.g. plain `npm run dev` with no Vercel functions running).
@@ -15,6 +16,7 @@ export function localShadeEstimate(points, departure) {
       isNight: true,
       sunAltitude: altitudeDeg,
       sunAzimuth: azimuthDeg,
+      uvIndex: 0,
       source: 'local',
       note: 'After sunset — no direct sun on any route.',
     }
@@ -31,6 +33,7 @@ export function localShadeEstimate(points, departure) {
     isNight: false,
     sunAltitude: round2(altitudeDeg),
     sunAzimuth: round2(azimuthDeg),
+    uvIndex: estimateUvIndex(altitudeDeg),
     greenCoverage: null,
     source: 'local',
     note: 'Estimated from sun angle only — deploy to Vercel for tree/park data.',

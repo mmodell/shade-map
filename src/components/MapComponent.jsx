@@ -22,6 +22,7 @@ const FALLBACK_CENTER = { lat: 40.7128, lng: -74.006 }
 
 export default function MapComponent({ isLoaded, routes, paths, selectedId, onSelect }) {
   const mapRef = useRef(null)
+  const wrapRef = useRef(null)
 
   const endpoints = useMemo(() => {
     const first = routes[0]?.overview
@@ -29,11 +30,28 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
     return { start: first[0], end: first[first.length - 1] }
   }, [routes])
 
-  useEffect(() => {
+  const fitToRoutes = () => {
     if (!mapRef.current || !window.google || !routes.length) return
     const bounds = new window.google.maps.LatLngBounds()
     routes.forEach((r) => (r.overview || []).forEach((p) => bounds.extend(p)))
     if (!bounds.isEmpty()) mapRef.current.fitBounds(bounds, 64)
+  }
+
+  useEffect(fitToRoutes, [routes])
+
+  // The panel collapses/expands around the map — keep Google Maps in sync with
+  // its container size so it doesn't render grey bands.
+  useEffect(() => {
+    if (!wrapRef.current || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      if (mapRef.current && window.google) {
+        window.google.maps.event.trigger(mapRef.current, 'resize')
+        fitToRoutes()
+      }
+    })
+    ro.observe(wrapRef.current)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routes])
 
   if (!isLoaded) {
@@ -41,7 +59,7 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
   }
 
   return (
-    <div className="map">
+    <div className="map" ref={wrapRef}>
       <GoogleMap
         mapContainerClassName="map__canvas"
         center={FALLBACK_CENTER}

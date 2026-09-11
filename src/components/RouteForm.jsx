@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import PlaceField from './PlaceField'
+import { TRAVEL_MODES } from '../lib/googleDirections'
+import { formatClock } from '../lib/format'
 
 const WEIGHT_FIELDS = [
   { key: 'shade', label: 'Shade', hint: 'Prefer tree cover & shadow' },
@@ -13,7 +15,11 @@ export default function RouteForm({
   onDepartureChange,
   weights,
   onWeightsChange,
+  mode,
+  onModeChange,
   status,
+  collapsed,
+  onExpand,
   onSubmit,
 }) {
   const [origin, setOrigin] = useState(null) // { text, location }
@@ -23,6 +29,8 @@ export default function RouteForm({
   const [error, setError] = useState('')
 
   const busy = status === 'loading'
+  const originText = geoOrigin ? 'Current location' : origin?.text
+  const modeInfo = TRAVEL_MODES.find((m) => m.id === mode) || TRAVEL_MODES[0]
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -33,7 +41,13 @@ export default function RouteForm({
       return
     }
     setError('')
-    onSubmit({ origin: originValue, destination: destValue })
+    onSubmit({
+      origin: originValue,
+      destination: destValue,
+      mode,
+      originText: originText || 'Start',
+      destText: destination?.text || 'Destination',
+    })
   }
 
   function useMyLocation() {
@@ -56,6 +70,21 @@ export default function RouteForm({
     )
   }
 
+  if (collapsed) {
+    return (
+      <button type="button" className="tripbar" onClick={onExpand}>
+        <span className="tripbar__mode">{modeInfo.glyph}</span>
+        <span className="tripbar__route">
+          <span className="tripbar__pt">{originText || 'Start'}</span>
+          <span className="tripbar__arrow">→</span>
+          <span className="tripbar__pt">{destination?.text || 'Destination'}</span>
+        </span>
+        <span className="tripbar__time">{formatClock(departure)}</span>
+        <span className="tripbar__edit">Edit</span>
+      </button>
+    )
+  }
+
   const locationButton = (
     <button
       type="button"
@@ -70,6 +99,20 @@ export default function RouteForm({
 
   return (
     <form className="form" onSubmit={handleSubmit}>
+      <div className="modes" role="group" aria-label="Travel mode">
+        {TRAVEL_MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`modes__btn${m.id === mode ? ' modes__btn--on' : ''}`}
+            aria-pressed={m.id === mode}
+            onClick={() => onModeChange(m.id)}
+          >
+            <span aria-hidden="true">{m.glyph}</span> {m.label}
+          </button>
+        ))}
+      </div>
+
       {geoOrigin ? (
         <div className="form__field">
           <label>From</label>
@@ -129,33 +172,41 @@ export default function RouteForm({
         </div>
       </div>
 
-      <fieldset className="form__weights">
-        <legend>What matters most</legend>
-        {WEIGHT_FIELDS.map(({ key, label, hint }) => (
-          <div className="weight" key={key}>
-            <div className="weight__row">
-              <span className="weight__label">{label}</span>
-              <span className="weight__val">{Math.round(weights[key] * 100)}</span>
+      <details className="form__weights-wrap">
+        <summary>
+          What matters most
+          <span className="form__weights-sum">
+            shade {Math.round(weights.shade * 100)} · direct {Math.round(weights.distance * 100)} ·
+            safety {Math.round(weights.safety * 100)}
+          </span>
+        </summary>
+        <fieldset className="form__weights">
+          {WEIGHT_FIELDS.map(({ key, label, hint }) => (
+            <div className="weight" key={key}>
+              <div className="weight__row">
+                <span className="weight__label">{label}</span>
+                <span className="weight__val">{Math.round(weights[key] * 100)}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(weights[key] * 100)}
+                onChange={(e) =>
+                  onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
+                }
+                aria-label={`${label} priority`}
+              />
+              <span className="weight__hint">{hint}</span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={Math.round(weights[key] * 100)}
-              onChange={(e) =>
-                onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
-              }
-              aria-label={`${label} priority`}
-            />
-            <span className="weight__hint">{hint}</span>
-          </div>
-        ))}
-      </fieldset>
+          ))}
+        </fieldset>
+      </details>
 
       {error && <p className="form__err">{error}</p>}
 
       <button className="form__submit" type="submit" disabled={busy || !isLoaded}>
-        {busy ? 'Finding shade…' : 'Find routes'}
+        {busy ? 'Finding routes…' : 'Find routes'}
       </button>
     </form>
   )

@@ -5,6 +5,7 @@ import {
   distToPolyline,
   pathLengthMeters,
 } from './geo.js'
+import { estimateUvIndex } from './sun.js'
 
 const TREE_RADIUS_M = 9
 const GREEN_LINE_RADIUS_M = 10
@@ -52,6 +53,7 @@ export function computeShade({ points, osm, date }) {
       isNight: true,
       sunAltitude: round1(altitudeDeg),
       sunAzimuth: round1(azimuthDeg),
+      uvIndex: 0,
       greenCoverage: round2(greenCoverage),
       builtUpFactor: round2(builtUpFactor),
       note: 'After sunset — comfort comes down to lighting and safety.',
@@ -73,6 +75,7 @@ export function computeShade({ points, osm, date }) {
     isNight: false,
     sunAltitude: round1(altitudeDeg),
     sunAzimuth: round1(azimuthDeg),
+    uvIndex: estimateUvIndex(altitudeDeg),
     greenCoverage: round2(greenCoverage),
     builtUpFactor: round2(builtUpFactor),
     canopyShare: round2(canopyShade),

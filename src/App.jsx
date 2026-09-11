@@ -4,7 +4,8 @@ import RouteForm from './components/RouteForm'
 import MapComponent from './components/MapComponent'
 import WeatherTimeline from './components/WeatherTimeline'
 import RouteList from './components/RouteList'
-import { requestWalkingRoutes, samplePath, routeSummary } from './lib/googleDirections'
+import RouteSteps from './components/RouteSteps'
+import { requestRoutes, samplePath, routeSummary } from './lib/googleDirections'
 import { analyzeRoutes } from './lib/analyze'
 import { rankRoutes } from './lib/ranking'
 import './App.css'
@@ -24,30 +25,37 @@ export default function App() {
 
   const [departure, setDeparture] = useState(() => roundToNextQuarterHour(new Date()))
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS)
+  const [mode, setMode] = useState('WALKING')
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [analyzed, setAnalyzed] = useState([])
   const [meta, setMeta] = useState({ degraded: false, weather: null })
   const [selectedId, setSelectedId] = useState(null)
+  const [formOpen, setFormOpen] = useState(true)
+  const [trip, setTrip] = useState(null) // { originText, destText, mode }
   const pathsRef = useRef(new Map())
+  const stepsRef = useRef(new Map())
 
   const ranked = useMemo(() => rankRoutes(analyzed, weights), [analyzed, weights])
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
 
   const runSearch = useCallback(
-    async ({ origin, destination }) => {
+    async ({ origin, destination, mode: reqMode, originText, destText }) => {
       if (!origin || !destination) return
       setStatus('loading')
       setErrorMsg('')
+      setTrip({ originText, destText, mode: reqMode })
       try {
-        const result = await requestWalkingRoutes({ origin, destination })
+        const result = await requestRoutes({ origin, destination, mode: reqMode })
         const routes = result.routes.slice(0, MAX_ROUTES)
         const paths = new Map()
+        const steps = new Map()
         const candidates = routes.map((route, i) => {
           const id = String(i)
           const overview = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }))
           paths.set(id, overview)
           const summary = routeSummary(route)
+          steps.set(id, summary.steps)
           return {
             id,
             label: routeLabel(i, summary),
@@ -60,6 +68,7 @@ export default function App() {
           }
         })
         pathsRef.current = paths
+        stepsRef.current = steps
 
         const analysis = await analyzeRoutes({ candidates, departure })
         setAnalyzed(analysis.routes)
@@ -70,6 +79,7 @@ export default function App() {
         })
         setSelectedId(null)
         setStatus('done')
+        setFormOpen(false)
       } catch (err) {
         setErrorMsg(String(err.message || err))
         setStatus('error')
@@ -90,13 +100,15 @@ export default function App() {
     )
   }
 
+  const hasResults = status === 'done' && ranked.length > 0
+
   return (
-    <div className="app">
+    <div className={`app${hasResults && !formOpen ? ' app--compact' : ''}`}>
       <header className="app__header">
         <h1>
           <span className="app__mark" aria-hidden="true">☀︎</span> Shade Map
         </h1>
-        <p className="app__tag">Walking routes ranked by shade, comfort &amp; safety</p>
+        <p className="app__tag">Walking, biking &amp; driving routes ranked by shade &amp; comfort</p>
       </header>
 
       <main className="app__body">
@@ -107,7 +119,11 @@ export default function App() {
             onDepartureChange={setDeparture}
             weights={weights}
             onWeightsChange={setWeights}
+            mode={mode}
+            onModeChange={setMode}
             status={status}
+            collapsed={hasResults && !formOpen}
+            onExpand={() => setFormOpen(true)}
             onSubmit={runSearch}
           />
 
@@ -115,19 +131,22 @@ export default function App() {
 
           {meta.degraded && status === 'done' && (
             <p className="app__notice">
-              Showing a sun-angle-only estimate — the analyzer wasn’t reachable
-              {meta.degradedReason ? ` (${meta.degradedReason})` : ''}. Deploy to Vercel or run
-              <code> npm run dev:full </code> for tree, park and safety data.
+              Shade estimated from sun angle only — the analyzer wasn’t reachable
+              {meta.degradedReason ? ` (${meta.degradedReason})` : ''}.
             </p>
           )}
 
-          {status === 'done' && ranked.length > 0 && (
-            <RouteList
-              routes={ranked}
-              selectedId={selected?.id}
-              onSelect={setSelectedId}
-              weather={meta.weather}
-            />
+          {hasResults && (
+            <>
+              <RouteList
+                routes={ranked}
+                selectedId={selected?.id}
+                onSelect={setSelectedId}
+              />
+              {selected && (
+                <RouteSteps steps={stepsRef.current.get(selected.id)} routeLabel={selected.label} />
+              )}
+            </>
           )}
         </section>
 
@@ -139,9 +158,10 @@ export default function App() {
             selectedId={selected?.id}
             onSelect={setSelectedId}
           />
-          {status === 'done' && selected && meta.weather && (
+          {hasResults && selected && (
             <WeatherTimeline
               weather={meta.weather}
+              shade={selected.shade}
               departure={departure}
               durationSeconds={selected.durationSeconds}
             />

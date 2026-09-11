@@ -1,4 +1,5 @@
 import SunCalc from 'suncalc'
+import { estimateUvIndex } from './sun.js'
 
 const BASE = 'https://api.openweathermap.org/data/2.5'
 
@@ -47,15 +48,8 @@ function normalize(src, lat, lng, dtSeconds) {
     condition: w.main || 'Clear',
     description: w.description || '',
     icon: w.icon || null,
-    uvIndex: estimateUv(date, lat, lng, clouds),
+    uvIndex: estimateUvIndex((SunCalc.getPosition(date, lat, lng).altitude * 180) / Math.PI, clouds),
   }
-}
-
-function estimateUv(date, lat, lng, cloudsPct) {
-  const alt = SunCalc.getPosition(date, lat, lng).altitude
-  if (alt <= 0) return 0
-  const clear = 10 * Math.sin(alt) ** 1.1
-  return Math.round(clear * (1 - 0.7 * (cloudsPct / 100)))
 }
 
 async function safeJson(url) {
