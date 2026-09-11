@@ -21,7 +21,11 @@ export async function analyzeRoutes({ candidates, departure }) {
     })
     if (!res.ok) throw new Error(`analyzer returned ${res.status}`)
     const data = await res.json()
-    return mergeById(candidates, data.routes, { degraded: false, weather: data.weather ?? null })
+    return mergeById(candidates, data.routes, {
+      degraded: false,
+      weather: data.weather ?? null,
+      crime: data.crime ?? null,
+    })
   } catch (err) {
     // Offline / no serverless function — degrade gracefully.
     const routes = candidates.map((c) => ({

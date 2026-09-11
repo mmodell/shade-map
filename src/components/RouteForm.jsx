@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import PlaceField from './PlaceField'
+import MicButton from './MicButton'
 import { TRAVEL_MODES } from '../lib/googleDirections'
 import { formatClock } from '../lib/format'
+import { getSavedPlaces, savePlace } from '../lib/savedPlaces'
 
 const WEIGHT_FIELDS = [
   { key: 'shade', label: 'Shade', hint: 'Prefer tree cover & shadow' },
@@ -24,6 +26,7 @@ export default function RouteForm({
   onExpand,
   onSubmit,
   trip,
+  nightMode,
 }) {
   const [origin, setOrigin] = useState(null) // { text, location }
   const [destination, setDestination] = useState(null)
@@ -31,6 +34,7 @@ export default function RouteForm({
   const [stops, setStops] = useState([]) // [{ id, value: { text, location } | null }]
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(() => getSavedPlaces())
   const nextStopId = useRef(0)
 
   const busy = status === 'loading'
@@ -46,6 +50,10 @@ export default function RouteForm({
   }
   function setStopValue(id, value) {
     setStops((s) => s.map((stop) => (stop.id === id ? { ...stop, value } : stop)))
+  }
+
+  function saveAs(kind, place) {
+    setSaved(savePlace(kind, place))
   }
 
   function handleSubmit(e) {
@@ -115,16 +123,19 @@ export default function RouteForm({
     )
   }
 
-  const locationButton = (
-    <button
-      type="button"
-      className="form__ghost"
-      onClick={useMyLocation}
-      disabled={locating}
-      title="Use my current location"
-    >
-      {locating ? '…' : '◎'}
-    </button>
+  const originTrailing = (
+    <>
+      <MicButton onSelect={setOrigin} onError={setError} />
+      <button
+        type="button"
+        className="form__ghost"
+        onClick={useMyLocation}
+        disabled={locating}
+        title="Use my current location"
+      >
+        {locating ? '…' : '◎'}
+      </button>
+    </>
   )
 
   return (
@@ -165,10 +176,13 @@ export default function RouteForm({
           label="From"
           placeholder="Address or place"
           onSelect={setOrigin}
-          trailing={locationButton}
+          trailing={originTrailing}
         />
       ) : (
-        <LoadingField label="From" trailing={locationButton} />
+        <LoadingField label="From" trailing={originTrailing} />
+      )}
+      {origin && !geoOrigin && (
+        <SaveAsRow place={origin} saved={saved} onSave={saveAs} />
       )}
 
       {isLoaded &&
@@ -180,14 +194,17 @@ export default function RouteForm({
             placeholder="Address or place"
             onSelect={(v) => setStopValue(stop.id, v)}
             trailing={
-              <button
-                type="button"
-                className="form__ghost"
-                aria-label={`Remove stop ${i + 1}`}
-                onClick={() => removeStop(stop.id)}
-              >
-                ✕
-              </button>
+              <>
+                <MicButton onSelect={(v) => setStopValue(stop.id, v)} onError={setError} />
+                <button
+                  type="button"
+                  className="form__ghost"
+                  aria-label={`Remove stop ${i + 1}`}
+                  onClick={() => removeStop(stop.id)}
+                >
+                  ✕
+                </button>
+              </>
             }
           />
         ))}
@@ -198,16 +215,34 @@ export default function RouteForm({
         </button>
       )}
 
+      {(saved.home || saved.work) && (
+        <div className="quick-row">
+          <span className="quick-row__label">Go to</span>
+          {saved.home && (
+            <button type="button" className="quick-chip" onClick={() => setDestination(saved.home)}>
+              🏠 Home
+            </button>
+          )}
+          {saved.work && (
+            <button type="button" className="quick-chip" onClick={() => setDestination(saved.work)}>
+              💼 Work
+            </button>
+          )}
+        </div>
+      )}
+
       {isLoaded ? (
         <PlaceField
           id="destination"
           label="To"
           placeholder="Address or place"
           onSelect={setDestination}
+          trailing={<MicButton onSelect={setDestination} onError={setError} />}
         />
       ) : (
         <LoadingField label="To" />
       )}
+      {destination && <SaveAsRow place={destination} saved={saved} onSave={saveAs} />}
 
       <div className="form__field">
         <label htmlFor="departure">Leaving at</label>
@@ -238,25 +273,31 @@ export default function RouteForm({
           </span>
         </summary>
         <fieldset className="form__weights">
-          {WEIGHT_FIELDS.map(({ key, label, hint }) => (
-            <div className="weight" key={key}>
-              <div className="weight__row">
-                <span className="weight__label">{label}</span>
-                <span className="weight__val">{Math.round(weights[key] * 100)}</span>
+          {WEIGHT_FIELDS.map(({ key, label, hint }) => {
+            const isShadeAtNight = key === 'shade' && nightMode
+            return (
+              <div className={`weight${isShadeAtNight ? ' weight--dim' : ''}`} key={key}>
+                <div className="weight__row">
+                  <span className="weight__label">{label}</span>
+                  <span className="weight__val">{Math.round(weights[key] * 100)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(weights[key] * 100)}
+                  disabled={isShadeAtNight}
+                  onChange={(e) =>
+                    onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
+                  }
+                  aria-label={`${label} priority`}
+                />
+                <span className="weight__hint">
+                  {isShadeAtNight ? '🌙 Not relevant after dark — try Safety instead' : hint}
+                </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={Math.round(weights[key] * 100)}
-                onChange={(e) =>
-                  onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
-                }
-                aria-label={`${label} priority`}
-              />
-              <span className="weight__hint">{hint}</span>
-            </div>
-          ))}
+            )
+          })}
         </fieldset>
       </details>
 
@@ -266,6 +307,30 @@ export default function RouteForm({
         {busy ? 'Finding routes…' : 'Find routes'}
       </button>
     </form>
+  )
+}
+
+function SaveAsRow({ place, saved, onSave }) {
+  const sameAs = (kind) => saved[kind]?.text && saved[kind].text === place.text
+  return (
+    <div className="save-row">
+      {/* PlaceAutocompleteElement can't be pre-filled, so when a value comes
+          from voice input or a Home/Work chip the box itself looks empty —
+          confirm what's actually selected. */}
+      <span className="save-row__current" title={place.text}>
+        ✓ {place.text}
+      </span>
+      {!sameAs('home') && (
+        <button type="button" className="save-link" onClick={() => onSave('home', place)}>
+          ☆ Save as Home
+        </button>
+      )}
+      {!sameAs('work') && (
+        <button type="button" className="save-link" onClick={() => onSave('work', place)}>
+          ☆ Save as Work
+        </button>
+      )}
+    </div>
   )
 }
 

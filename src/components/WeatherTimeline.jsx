@@ -38,11 +38,11 @@ export default function WeatherTimeline({ weather, shade, departure, durationSec
   // UV: prefer the forecast timeline, fall back to the route's sun-angle estimate.
   const uv = steps.length
     ? Math.max(...steps.map((s) => s.uvIndex ?? 0))
-    : shade?.uvIndex ?? null
+    : (shade?.uvIndex ?? 0)
   const uvCat = uvCategory(uv)
-  const isNight = shade?.isNight || (uv === 0 && (shade?.sunAltitude ?? 1) <= 0)
+  const isNight = shade?.isNight ?? false
 
-  if (!steps.length && uv == null && !isNight) return null
+  if (!steps.length && shade == null) return null
 
   const start = steps[0]
 
@@ -64,16 +64,14 @@ export default function WeatherTimeline({ weather, shade, departure, durationSec
           <span className="weather__glyph">{isNight ? '🌙' : '☀︎'}</span>
         )}
 
-        {isNight ? (
-          <span className="weather__uv" style={{ color: 'var(--text-dim)' }}>
-            After sunset
-          </span>
-        ) : (
-          <span className="weather__uv" style={{ color: uvCat.color }}>
-            UV {uv} · {uvCat.label}
-          </span>
-        )}
-        {!start && shade?.sunAltitude != null && !isNight && (
+        {/* Always shown, day or night, so UV never reads as "missing" — it's
+            just 0 after dark rather than replaced by other text. */}
+        <span className="weather__uv" style={{ color: isNight ? 'var(--text-dim)' : uvCat.color }}>
+          UV {uv}
+          {!isNight && ` · ${uvCat.label}`}
+        </span>
+        {isNight && <span className="weather__dim">after sunset</span>}
+        {!start && !isNight && shade?.sunAltitude != null && (
           <span className="weather__dim">sun {Math.round(shade.sunAltitude)}° up</span>
         )}
         {advice(steps, uv, units) && (

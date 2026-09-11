@@ -44,6 +44,10 @@ export default function App() {
 
   const ranked = useMemo(() => rankRoutes(analyzed, weights), [analyzed, weights])
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
+  // All routes in one search share a departure time & rough location, so
+  // they're all night or all day together — every route gets shadeFraction
+  // ~1 after dark, which makes the Shade slider a no-op; tell the user why.
+  const nightMode = analyzed.some((r) => r.shade?.isNight)
 
   // Persist just enough to rebuild the screen after a refresh — no re-query needed.
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function App() {
             onExpand={() => setFormOpen(true)}
             onSubmit={runSearch}
             trip={trip}
+            nightMode={nightMode}
           />
 
           {status === 'error' && <p className="app__error">{errorMsg}</p>}
@@ -156,6 +161,13 @@ export default function App() {
             <p className="app__notice">
               Shade estimated from sun angle only — the analyzer wasn’t reachable
               {meta.degradedReason ? ` (${meta.degradedReason})` : ''}.
+            </p>
+          )}
+
+          {meta.crime && status === 'done' && (
+            <p className="app__notice app__notice--crime">
+              📊 {meta.crime.state} violent crime is {meta.crime.label} (FBI, {meta.crime.year}) —
+              a statewide figure, not specific to this route.
             </p>
           )}
 

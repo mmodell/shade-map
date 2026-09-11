@@ -14,10 +14,10 @@ const BIG_ROADS = new Set(['secondary', 'primary', 'trunk'])
    - how much of the route has a sidewalk or is a dedicated pedestrian way
    - how much runs alongside a big road with no sidewalk
    - at night, how much of it is lit */
-export function computeSafety({ matchedTags, lighting, date, lat, lng }) {
+export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) {
   const matched = matchedTags.filter(Boolean)
   if (!matched.length) {
-    return { score: 0.5, note: 'No path data nearby — treating as neutral.' }
+    return { score: 0.5, note: 'No path data nearby — treating as neutral.', crime: crime || null }
   }
 
   let pedestrianFriendly = 0
@@ -44,12 +44,27 @@ export function computeSafety({ matchedTags, lighting, date, lat, lng }) {
   }
   score = Math.max(0, Math.min(1, score))
 
+  // A state-wide crime estimate is far coarser than the per-route sidewalk/
+  // lighting signal above, so it only nudges the score (±25% at most), not
+  // dominate it.
+  if (crime?.ratio != null) {
+    const crimeFactor = Math.max(0.75, Math.min(1.15, 1.15 - crime.ratio * 0.3))
+    score = Math.max(0, Math.min(1, score * crimeFactor))
+  }
+
   const notes = []
   if (pedShare > 0.7) notes.push('mostly sidewalks / paths')
   else if (bigRoadShare > 0.3) notes.push('runs along busy roads')
   if (isNight) notes.push(lighting.litFraction != null ? 'night — lighting weighted' : 'night')
+  if (crime?.label) notes.push(`${crime.state} crime is ${crime.label}`)
 
-  return { score: round2(score), pedShare: round2(pedShare), bigRoadShare: round2(bigRoadShare), note: notes.join(' · ') || null }
+  return {
+    score: round2(score),
+    pedShare: round2(pedShare),
+    bigRoadShare: round2(bigRoadShare),
+    note: notes.join(' · ') || null,
+    crime: crime || null,
+  }
 }
 
 const round2 = (n) => Math.round(n * 100) / 100

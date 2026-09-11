@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GoogleMap, Polyline, Marker } from '@react-google-maps/api'
 import { rankColor } from '../lib/ranking'
 
@@ -23,6 +23,20 @@ const FALLBACK_CENTER = { lat: 40.7128, lng: -74.006 }
 export default function MapComponent({ isLoaded, routes, paths, selectedId, onSelect }) {
   const mapRef = useRef(null)
   const wrapRef = useRef(null)
+  const [myLocation, setMyLocation] = useState(null)
+  const centeredOnMeRef = useRef(false)
+
+  // Ask for the user's location once, the way Google Maps itself does — a
+  // blue dot on the map, and (if there's no route yet) center there.
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
 
   const endpoints = useMemo(() => {
     const first = routes[0]?.overview
@@ -37,7 +51,32 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
     if (!bounds.isEmpty()) mapRef.current.fitBounds(bounds, 64)
   }
 
+  const goToMyLocation = () => {
+    const pan = (loc) => {
+      mapRef.current?.panTo(loc)
+      mapRef.current?.setZoom(15)
+    }
+    if (myLocation) {
+      pan(myLocation)
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setMyLocation(loc)
+        pan(loc)
+      })
+    }
+  }
+
   useEffect(fitToRoutes, [routes])
+
+  // First fix with no route on screen yet → open there instead of NYC.
+  useEffect(() => {
+    if (myLocation && !routes.length && !centeredOnMeRef.current && mapRef.current) {
+      centeredOnMeRef.current = true
+      mapRef.current.panTo(myLocation)
+      mapRef.current.setZoom(14)
+    }
+  }, [myLocation, routes.length])
 
   // The panel collapses/expands around the map — keep Google Maps in sync with
   // its container size so it doesn't render grey bands. Debounced and just
@@ -103,19 +142,46 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
             <Marker position={endpoints.end} label={{ text: 'B', color: '#0f172a' }} />
           </>
         )}
+
+        {myLocation && (
+          <Marker
+            position={myLocation}
+            zIndex={5}
+            title="Your location"
+            icon={{
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#4285f4',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            }}
+          />
+        )}
       </GoogleMap>
 
-      {routes.length > 0 && (
+      <div className="map__controls">
         <button
           type="button"
-          className="map__recenter"
-          onClick={fitToRoutes}
-          title="Center on route"
-          aria-label="Center on route"
+          className="map__ctrlbtn"
+          onClick={goToMyLocation}
+          title="My location"
+          aria-label="My location"
         >
-          ⌖
+          🎯
         </button>
-      )}
+        {routes.length > 0 && (
+          <button
+            type="button"
+            className="map__ctrlbtn"
+            onClick={fitToRoutes}
+            title="Center on route"
+            aria-label="Center on route"
+          >
+            ⌖
+          </button>
+        )}
+      </div>
     </div>
   )
 }

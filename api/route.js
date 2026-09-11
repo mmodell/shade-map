@@ -4,6 +4,7 @@ import { computeShade } from './_lib/shadeCalculator.js'
 import { computeLighting } from './_lib/lightingService.js'
 import { computeSafety } from './_lib/safetyService.js'
 import { getWeather } from './_lib/weatherService.js'
+import { getStateCrimeContext } from './_lib/crimeService.js'
 
 const MAX_ROUTES = 4
 const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildingCount: 0 }
@@ -26,6 +27,18 @@ export default async function handler(req, res) {
   const units = process.env.WEATHER_UNITS || 'imperial'
   const routes = Array.isArray(body?.routes) ? body.routes.slice(0, MAX_ROUTES) : []
   if (!routes.length) return res.status(400).json({ error: 'No routes provided' })
+
+  // Crime context is state-level, so it's the same for every route in this
+  // search — fetch it once from the first route's midpoint rather than once
+  // per route.
+  let crime = null
+  try {
+    const ref = sanitizePoints(routes[0].points)
+    const refMid = ref[Math.floor(ref.length / 2)] || ref[0]
+    if (refMid) crime = await getStateCrimeContext({ lat: refMid.lat, lng: refMid.lng })
+  } catch {
+    crime = null
+  }
 
   const analyzed = []
   for (const route of routes) {
@@ -51,7 +64,7 @@ export default async function handler(req, res) {
       shade.greenCoverage = null
     }
     const lighting = computeLighting({ matchedTags: matched, date, lat: mid.lat, lng: mid.lng })
-    const safety = computeSafety({ matchedTags: matched, lighting, date, lat: mid.lat, lng: mid.lng })
+    const safety = computeSafety({ matchedTags: matched, lighting, date, lat: mid.lat, lng: mid.lng, crime })
 
     analyzed.push({ id: route.id, shade, safety, lighting })
   }
@@ -66,7 +79,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Cache-Control', 'no-store')
-  return res.status(200).json({ routes: analyzed, weather, analyzedAt: new Date().toISOString() })
+  return res.status(200).json({ routes: analyzed, weather, crime, analyzedAt: new Date().toISOString() })
 }
 
 function sanitizePoints(points) {
