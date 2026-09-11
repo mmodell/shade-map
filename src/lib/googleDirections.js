@@ -8,7 +8,7 @@ export const TRAVEL_MODES = [
   { id: 'DRIVING', label: 'Drive', glyph: '🚗' },
 ]
 
-export function requestRoutes({ origin, destination, mode = 'WALKING' }) {
+export function requestRoutes({ origin, destination, waypoints = [], mode = 'WALKING' }) {
   return new Promise((resolve, reject) => {
     if (!window.google?.maps) {
       reject(new Error('Google Maps is not loaded yet.'))
@@ -21,7 +21,10 @@ export function requestRoutes({ origin, destination, mode = 'WALKING' }) {
         origin,
         destination,
         travelMode,
-        provideRouteAlternatives: true,
+        // Alternatives and waypoints don't mix well in the Directions API —
+        // with stops set, Google effectively returns just the one route.
+        provideRouteAlternatives: waypoints.length === 0,
+        waypoints: waypoints.map((location) => ({ location, stopover: true })),
       },
       (result, status) => {
         if (status === 'OK' && result?.routes?.length) {
@@ -101,9 +104,13 @@ export function routeSteps(route) {
 }
 
 function stripHtml(html) {
+  // Google tucks a second sentence ("Destination will be on the right") into
+  // a sibling <div> with no separator — add a space before block tags so it
+  // doesn't get glued onto the previous word.
+  const spaced = html.replace(/<(div|br)/gi, ' <$1')
   if (typeof document !== 'undefined') {
-    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const doc = new DOMParser().parseFromString(spaced, 'text/html')
     return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
   }
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return spaced.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }

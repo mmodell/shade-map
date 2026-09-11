@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import PlaceField from './PlaceField'
 import { TRAVEL_MODES } from '../lib/googleDirections'
 import { formatClock } from '../lib/format'
@@ -8,6 +8,8 @@ const WEIGHT_FIELDS = [
   { key: 'distance', label: 'Directness', hint: 'Prefer shorter routes' },
   { key: 'safety', label: 'Safety', hint: 'Prefer lit paths & sidewalks' },
 ]
+
+const MAX_STOPS = 6
 
 export default function RouteForm({
   isLoaded,
@@ -25,12 +27,25 @@ export default function RouteForm({
   const [origin, setOrigin] = useState(null) // { text, location }
   const [destination, setDestination] = useState(null)
   const [geoOrigin, setGeoOrigin] = useState(null) // { lat, lng } from the ◎ button
+  const [stops, setStops] = useState([]) // [{ id, value: { text, location } | null }]
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
+  const nextStopId = useRef(0)
 
   const busy = status === 'loading'
   const originText = geoOrigin ? 'Current location' : origin?.text
   const modeInfo = TRAVEL_MODES.find((m) => m.id === mode) || TRAVEL_MODES[0]
+
+  function addStop() {
+    if (stops.length >= MAX_STOPS) return
+    setStops((s) => [...s, { id: nextStopId.current++, value: null }])
+  }
+  function removeStop(id) {
+    setStops((s) => s.filter((stop) => stop.id !== id))
+  }
+  function setStopValue(id, value) {
+    setStops((s) => s.map((stop) => (stop.id === id ? { ...stop, value } : stop)))
+  }
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -40,13 +55,20 @@ export default function RouteForm({
       setError('Pick a start point and a destination from the suggestions.')
       return
     }
+    if (stops.some((s) => !s.value)) {
+      setError('Pick a place for each stop, or remove the empty one.')
+      return
+    }
     setError('')
+    const waypoints = stops.map((s) => s.value.location || s.value.text)
     onSubmit({
       origin: originValue,
       destination: destValue,
+      waypoints,
       mode,
       originText: originText || 'Start',
       destText: destination?.text || 'Destination',
+      stopCount: stops.length,
     })
   }
 
@@ -77,6 +99,9 @@ export default function RouteForm({
         <span className="tripbar__route">
           <span className="tripbar__pt">{originText || 'Start'}</span>
           <span className="tripbar__arrow">→</span>
+          {stops.length > 0 && (
+            <span className="tripbar__stops">+{stops.length} stop{stops.length > 1 ? 's' : ''} →</span>
+          )}
           <span className="tripbar__pt">{destination?.text || 'Destination'}</span>
         </span>
         <span className="tripbar__time">{formatClock(departure)}</span>
@@ -139,6 +164,33 @@ export default function RouteForm({
         />
       ) : (
         <LoadingField label="From" trailing={locationButton} />
+      )}
+
+      {isLoaded &&
+        stops.map((stop, i) => (
+          <PlaceField
+            key={stop.id}
+            id={`stop-${stop.id}`}
+            label={`Stop ${i + 1}`}
+            placeholder="Address or place"
+            onSelect={(v) => setStopValue(stop.id, v)}
+            trailing={
+              <button
+                type="button"
+                className="form__ghost"
+                aria-label={`Remove stop ${i + 1}`}
+                onClick={() => removeStop(stop.id)}
+              >
+                ✕
+              </button>
+            }
+          />
+        ))}
+
+      {isLoaded && stops.length < MAX_STOPS && (
+        <button type="button" className="form__addstop" onClick={addStop}>
+          + Add stop
+        </button>
       )}
 
       {isLoaded ? (

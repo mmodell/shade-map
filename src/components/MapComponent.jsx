@@ -93,6 +93,18 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
           </>
         )}
       </GoogleMap>
+
+      {routes.length > 0 && (
+        <button
+          type="button"
+          className="map__recenter"
+          onClick={fitToRoutes}
+          title="Center on route"
+          aria-label="Center on route"
+        >
+          ⌖
+        </button>
+      )}
     </div>
   )
 }

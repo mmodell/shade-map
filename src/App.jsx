@@ -40,13 +40,13 @@ export default function App() {
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
 
   const runSearch = useCallback(
-    async ({ origin, destination, mode: reqMode, originText, destText }) => {
+    async ({ origin, destination, waypoints, mode: reqMode, originText, destText, stopCount }) => {
       if (!origin || !destination) return
       setStatus('loading')
       setErrorMsg('')
-      setTrip({ originText, destText, mode: reqMode })
+      setTrip({ originText, destText, mode: reqMode, stopCount })
       try {
-        const result = await requestRoutes({ origin, destination, mode: reqMode })
+        const result = await requestRoutes({ origin, destination, waypoints, mode: reqMode })
         const routes = result.routes.slice(0, MAX_ROUTES)
         const paths = new Map()
         const steps = new Map()
