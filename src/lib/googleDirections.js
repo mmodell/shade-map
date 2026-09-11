@@ -96,7 +96,10 @@ export function routeSteps(route) {
       out.push({
         text: stripHtml(s.instructions || ''),
         distance: s.distance?.text || '',
+        distanceMeters: s.distance?.value || 0,
         maneuver: s.maneuver || '',
+        start: s.start_location ? { lat: s.start_location.lat(), lng: s.start_location.lng() } : null,
+        end: s.end_location ? { lat: s.end_location.lat(), lng: s.end_location.lng() } : null,
       })
     }
   }

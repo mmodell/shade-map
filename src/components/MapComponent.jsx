@@ -40,19 +40,30 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
   useEffect(fitToRoutes, [routes])
 
   // The panel collapses/expands around the map — keep Google Maps in sync with
-  // its container size so it doesn't render grey bands.
+  // its container size so it doesn't render grey bands. Debounced and just
+  // triggers 'resize' (no forced re-fit) so it can't fight a user's own pan/zoom.
   useEffect(() => {
     if (!wrapRef.current || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(() => {
-      if (mapRef.current && window.google) {
-        window.google.maps.event.trigger(mapRef.current, 'resize')
-        fitToRoutes()
-      }
+    let raf = 0
+    let lastSize = ''
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      const size = `${Math.round(width)}x${Math.round(height)}`
+      if (size === lastSize) return
+      lastSize = size
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        if (mapRef.current && window.google) {
+          window.google.maps.event.trigger(mapRef.current, 'resize')
+        }
+      })
     })
     ro.observe(wrapRef.current)
-    return () => ro.disconnect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routes])
+    return () => {
+      ro.disconnect()
+      cancelAnimationFrame(raf)
+    }
+  }, [])
 
   if (!isLoaded) {
     return <div className="map map--loading">Loading map…</div>

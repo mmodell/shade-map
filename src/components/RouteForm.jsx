@@ -23,6 +23,7 @@ export default function RouteForm({
   collapsed,
   onExpand,
   onSubmit,
+  trip,
 }) {
   const [origin, setOrigin] = useState(null) // { text, location }
   const [destination, setDestination] = useState(null)
@@ -93,16 +94,20 @@ export default function RouteForm({
   }
 
   if (collapsed) {
+    // Sourced from the last submitted search (App's `trip`), not the live form
+    // fields — this is what lets the trip bar survive a page refresh even
+    // though the Places widgets themselves can't be pre-filled.
+    const stopCount = trip?.stopCount ?? stops.length
     return (
       <button type="button" className="tripbar" onClick={onExpand}>
         <span className="tripbar__mode">{modeInfo.glyph}</span>
         <span className="tripbar__route">
-          <span className="tripbar__pt">{originText || 'Start'}</span>
+          <span className="tripbar__pt">{trip?.originText || originText || 'Start'}</span>
           <span className="tripbar__arrow">→</span>
-          {stops.length > 0 && (
-            <span className="tripbar__stops">+{stops.length} stop{stops.length > 1 ? 's' : ''} →</span>
+          {stopCount > 0 && (
+            <span className="tripbar__stops">+{stopCount} stop{stopCount > 1 ? 's' : ''} →</span>
           )}
-          <span className="tripbar__pt">{destination?.text || 'Destination'}</span>
+          <span className="tripbar__pt">{trip?.destText || destination?.text || 'Destination'}</span>
         </span>
         <span className="tripbar__time">{formatClock(departure)}</span>
         <span className="tripbar__edit">Edit</span>

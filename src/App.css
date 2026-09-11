@@ -420,6 +420,9 @@
   font-size: 12px;
   padding-top: 1px;
 }
+.steps__shade {
+  color: var(--sun);
+}
 .steps__dist {
   color: var(--text-dim);
   font-size: 11.5px;
@@ -552,19 +555,22 @@
   .app__panel {
     border-right: none;
     border-bottom: 1px solid var(--border);
-    max-height: 58vh;
+    /* Explicit heights (not flex-grow) — flex-grow needs a definite size on
+       an ancestor to resolve against, and min-height:100% chains through
+       several nested flex boxes don't reliably give it one on phones. */
+    height: 58vh;
     flex: none;
   }
   .app__map {
-    flex: 1;
-    min-height: 38vh;
+    height: 42vh;
+    flex: none;
   }
   /* Form collapsed → hand most of the screen to the map. */
   .app--compact .app__panel {
-    max-height: 40vh;
+    height: 32vh;
   }
   .app--compact .app__map {
-    min-height: 55vh;
+    height: 65vh;
   }
 }
 

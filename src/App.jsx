@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
 import RouteForm from './components/RouteForm'
 import MapComponent from './components/MapComponent'
@@ -8,6 +8,7 @@ import RouteSteps from './components/RouteSteps'
 import { requestRoutes, samplePath, routeSummary } from './lib/googleDirections'
 import { analyzeRoutes } from './lib/analyze'
 import { rankRoutes } from './lib/ranking'
+import { loadSession, saveSession } from './lib/persist'
 import './App.css'
 
 const MAPS_LIBRARIES = ['places', 'geometry']
@@ -23,28 +24,49 @@ export default function App() {
     libraries: MAPS_LIBRARIES,
   })
 
-  const [departure, setDeparture] = useState(() => roundToNextQuarterHour(new Date()))
-  const [weights, setWeights] = useState(DEFAULT_WEIGHTS)
-  const [mode, setMode] = useState('WALKING')
-  const [status, setStatus] = useState('idle') // idle | loading | done | error
+  // One-time restore of the last search, so a page refresh doesn't lose it.
+  const restored = useMemo(() => loadSession(), [])
+
+  const [departure, setDeparture] = useState(() =>
+    restored?.departure ? new Date(restored.departure) : roundToNextQuarterHour(new Date())
+  )
+  const [weights, setWeights] = useState(() => restored?.weights || DEFAULT_WEIGHTS)
+  const [mode, setMode] = useState(() => restored?.mode || 'WALKING')
+  const [status, setStatus] = useState(() => restored?.status || 'idle') // idle | loading | done | error
   const [errorMsg, setErrorMsg] = useState('')
-  const [analyzed, setAnalyzed] = useState([])
-  const [meta, setMeta] = useState({ degraded: false, weather: null })
-  const [selectedId, setSelectedId] = useState(null)
-  const [formOpen, setFormOpen] = useState(true)
-  const [trip, setTrip] = useState(null) // { originText, destText, mode }
-  const pathsRef = useRef(new Map())
-  const stepsRef = useRef(new Map())
+  const [analyzed, setAnalyzed] = useState(() => restored?.analyzed || [])
+  const [meta, setMeta] = useState(() => restored?.meta || { degraded: false, weather: null })
+  const [selectedId, setSelectedId] = useState(() => restored?.selectedId ?? null)
+  const [formOpen, setFormOpen] = useState(() => restored?.status !== 'done')
+  const [trip, setTrip] = useState(() => restored?.trip || null)
+  const pathsRef = useRef(new Map(restored?.paths || []))
+  const stepsRef = useRef(new Map(restored?.steps || []))
 
   const ranked = useMemo(() => rankRoutes(analyzed, weights), [analyzed, weights])
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
+
+  // Persist just enough to rebuild the screen after a refresh — no re-query needed.
+  useEffect(() => {
+    saveSession({
+      weights,
+      mode,
+      departure: departure.toISOString(),
+      status,
+      trip,
+      analyzed,
+      meta,
+      selectedId,
+      paths: [...pathsRef.current.entries()],
+      steps: [...stepsRef.current.entries()],
+    })
+  }, [weights, mode, departure, status, trip, analyzed, meta, selectedId])
 
   const runSearch = useCallback(
     async ({ origin, destination, waypoints, mode: reqMode, originText, destText, stopCount }) => {
       if (!origin || !destination) return
       setStatus('loading')
       setErrorMsg('')
-      setTrip({ originText, destText, mode: reqMode, stopCount })
+      setTrip({ originText, destText, stopCount })
       try {
         const result = await requestRoutes({ origin, destination, waypoints, mode: reqMode })
         const routes = result.routes.slice(0, MAX_ROUTES)
@@ -125,6 +147,7 @@ export default function App() {
             collapsed={hasResults && !formOpen}
             onExpand={() => setFormOpen(true)}
             onSubmit={runSearch}
+            trip={trip}
           />
 
           {status === 'error' && <p className="app__error">{errorMsg}</p>}
@@ -144,7 +167,7 @@ export default function App() {
                 onSelect={setSelectedId}
               />
               {selected && (
-                <RouteSteps steps={stepsRef.current.get(selected.id)} routeLabel={selected.label} />
+                <RouteSteps steps={stepsRef.current.get(selected.id)} shade={selected.shade} />
               )}
             </>
           )}
