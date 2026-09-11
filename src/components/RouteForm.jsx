@@ -24,6 +24,7 @@ export default function RouteForm({
   status,
   collapsed,
   onExpand,
+  onCollapse,
   onSubmit,
   trip,
   nightMode,
@@ -140,18 +141,29 @@ export default function RouteForm({
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <div className="modes" role="group" aria-label="Travel mode">
-        {TRAVEL_MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={`modes__btn${m.id === mode ? ' modes__btn--on' : ''}`}
-            aria-pressed={m.id === mode}
-            onClick={() => onModeChange(m.id)}
-          >
-            <span aria-hidden="true">{m.glyph}</span> {m.label}
-          </button>
-        ))}
+      <div className="modes-row">
+        <div className="modes" role="group" aria-label="Travel mode">
+          {TRAVEL_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`modes__btn${m.id === mode ? ' modes__btn--on' : ''}`}
+              aria-pressed={m.id === mode}
+              onClick={() => onModeChange(m.id)}
+            >
+              <span aria-hidden="true">{m.glyph}</span> {m.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="form__collapse"
+          onClick={onCollapse}
+          title="Minimize"
+          aria-label="Minimize"
+        >
+          ⌄
+        </button>
       </div>
 
       {geoOrigin ? (

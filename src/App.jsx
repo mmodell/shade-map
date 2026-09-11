@@ -129,7 +129,7 @@ export default function App() {
   const hasResults = status === 'done' && ranked.length > 0
 
   return (
-    <div className={`app${hasResults && !formOpen ? ' app--compact' : ''}`}>
+    <div className={`app${!formOpen ? ' app--compact' : ''}`}>
       <header className="app__header">
         <h1>
           <span className="app__mark" aria-hidden="true">☀︎</span> Shade Map
@@ -148,8 +148,9 @@ export default function App() {
             mode={mode}
             onModeChange={setMode}
             status={status}
-            collapsed={hasResults && !formOpen}
+            collapsed={!formOpen}
             onExpand={() => setFormOpen(true)}
+            onCollapse={() => setFormOpen(false)}
             onSubmit={runSearch}
             trip={trip}
             nightMode={nightMode}
