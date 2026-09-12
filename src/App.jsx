@@ -72,7 +72,7 @@ export default function App() {
       setErrorMsg('')
       setTrip({ originText, destText, stopCount })
       try {
-        const result = await requestRoutes({ origin, destination, waypoints, mode: reqMode })
+        const result = await requestRoutes({ origin, destination, waypoints, mode: reqMode, departure })
         const routes = result.routes.slice(0, MAX_ROUTES)
         const paths = new Map()
         const steps = new Map()
@@ -89,6 +89,7 @@ export default function App() {
             overview,
             distanceMeters: summary.distanceMeters,
             durationSeconds: summary.durationSeconds,
+            durationInTrafficSeconds: summary.durationInTrafficSeconds,
             startAddress: summary.startAddress,
             endAddress: summary.endAddress,
           }
@@ -102,6 +103,7 @@ export default function App() {
           degraded: analysis.degraded,
           degradedReason: analysis.degradedReason,
           weather: analysis.weather,
+          crime: analysis.crime,
         })
         setSelectedId(null)
         setStatus('done')
@@ -199,7 +201,7 @@ export default function App() {
               weather={meta.weather}
               shade={selected.shade}
               departure={departure}
-              durationSeconds={selected.durationSeconds}
+              durationSeconds={selected.durationInTrafficSeconds || selected.durationSeconds}
             />
           )}
         </section>

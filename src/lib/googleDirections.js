@@ -8,7 +8,7 @@ export const TRAVEL_MODES = [
   { id: 'DRIVING', label: 'Drive', glyph: '🚗' },
 ]
 
-export function requestRoutes({ origin, destination, waypoints = [], mode = 'WALKING' }) {
+export function requestRoutes({ origin, destination, waypoints = [], mode = 'WALKING', departure }) {
   return new Promise((resolve, reject) => {
     if (!window.google?.maps) {
       reject(new Error('Google Maps is not loaded yet.'))
@@ -16,16 +16,26 @@ export function requestRoutes({ origin, destination, waypoints = [], mode = 'WAL
     }
     const travelMode = window.google.maps.TravelMode[mode] || window.google.maps.TravelMode.WALKING
     const service = new window.google.maps.DirectionsService()
+    const request = {
+      origin,
+      destination,
+      travelMode,
+      // Alternatives and waypoints don't mix well in the Directions API —
+      // with stops set, Google effectively returns just the one route.
+      provideRouteAlternatives: waypoints.length === 0,
+      waypoints: waypoints.map((location) => ({ location, stopover: true })),
+    }
+    // Traffic-aware ETA — like real Google Maps' driving time — only works
+    // for a departure that's now or in the future; a past time falls back to
+    // the plain historical-average duration.
+    if (mode === 'DRIVING' && departure instanceof Date && departure.getTime() >= Date.now() - 60000) {
+      request.drivingOptions = {
+        departureTime: departure.getTime() > Date.now() ? departure : new Date(),
+        trafficModel: 'bestguess',
+      }
+    }
     service.route(
-      {
-        origin,
-        destination,
-        travelMode,
-        // Alternatives and waypoints don't mix well in the Directions API —
-        // with stops set, Google effectively returns just the one route.
-        provideRouteAlternatives: waypoints.length === 0,
-        waypoints: waypoints.map((location) => ({ location, stopover: true })),
-      },
+      request,
       (result, status) => {
         if (status === 'OK' && result?.routes?.length) {
           resolve(result)
@@ -77,9 +87,14 @@ export function routeSummary(route) {
   const legs = route.legs || []
   const distanceMeters = legs.reduce((s, l) => s + (l.distance?.value || 0), 0)
   const durationSeconds = legs.reduce((s, l) => s + (l.duration?.value || 0), 0)
+  const hasTraffic = legs.every((l) => l.duration_in_traffic)
+  const durationInTrafficSeconds = hasTraffic
+    ? legs.reduce((s, l) => s + (l.duration_in_traffic?.value || 0), 0)
+    : null
   return {
     distanceMeters,
     durationSeconds,
+    durationInTrafficSeconds,
     startAddress: leg?.start_address,
     endAddress: leg?.end_address,
     summary: route.summary,

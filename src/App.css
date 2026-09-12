@@ -227,6 +227,26 @@
   border-color: var(--accent);
 }
 
+.swap-btn {
+  align-self: flex-end;
+  margin: -8px 2px -2px 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-dim);
+  font-size: 13px;
+  z-index: 1;
+}
+.swap-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .mic {
   font-size: 15px;
 }
@@ -595,6 +615,69 @@
 .map__ctrlbtn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.map__chips {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 64px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  z-index: 2;
+}
+.map__chip {
+  padding: 7px 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.map__chip--on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+.map__chipstatus {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: rgba(15, 23, 42, 0.85);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.map__layers {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+}
+.map__layerspanel {
+  position: absolute;
+  bottom: 46px;
+  left: 0;
+  min-width: 130px;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.map__layerrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 /* ---------- weather ---------- */

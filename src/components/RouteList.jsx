@@ -26,7 +26,10 @@ export default function RouteList({ routes, selectedId, onSelect }) {
               <div className="route__stats">
                 <Stat label="Shade" value={night ? 'night' : formatPercent(r.shade?.shadeFraction)} />
                 <Stat label="Distance" value={formatDistance(r.distanceMeters)} />
-                <Stat label="Time" value={formatDuration(r.durationSeconds)} />
+                <Stat
+                  label={r.durationInTrafficSeconds ? 'Time (traffic)' : 'Time'}
+                  value={formatDuration(r.durationInTrafficSeconds || r.durationSeconds)}
+                />
                 <Stat
                   label="UV"
                   value={

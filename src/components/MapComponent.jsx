@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GoogleMap, Polyline, Marker } from '@react-google-maps/api'
 import { rankColor } from '../lib/ranking'
+import { NEARBY_CATEGORIES, searchNearby } from '../lib/nearbyPlaces'
 
 const MAP_OPTIONS = {
   disableDefaultUI: true,
   zoomControl: true,
+  scaleControl: true,
   clickableIcons: false,
   gestureHandling: 'greedy',
   styles: [
@@ -23,8 +25,15 @@ const FALLBACK_CENTER = { lat: 40.7128, lng: -74.006 }
 export default function MapComponent({ isLoaded, routes, paths, selectedId, onSelect }) {
   const mapRef = useRef(null)
   const wrapRef = useRef(null)
+  const trafficLayerRef = useRef(null)
   const [myLocation, setMyLocation] = useState(null)
   const centeredOnMeRef = useRef(false)
+  const [mapType, setMapType] = useState('roadmap')
+  const [trafficOn, setTrafficOn] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(false)
+  const [nearbyCategory, setNearbyCategory] = useState(null)
+  const [nearbyPlaces, setNearbyPlaces] = useState([])
+  const [nearbyStatus, setNearbyStatus] = useState('idle') // idle | loading | error
 
   // Ask for the user's location once, the way Google Maps itself does — a
   // blue dot on the map, and (if there's no route yet) center there.
@@ -78,6 +87,37 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
     }
   }, [myLocation, routes.length])
 
+  // Traffic layer is a plain Maps JS overlay, not a React child — toggle it
+  // on/off the map instance directly.
+  useEffect(() => {
+    if (!window.google || !mapRef.current) return
+    if (!trafficLayerRef.current) {
+      trafficLayerRef.current = new window.google.maps.TrafficLayer()
+    }
+    trafficLayerRef.current.setMap(trafficOn ? mapRef.current : null)
+  }, [trafficOn, isLoaded])
+
+  async function toggleCategory(category) {
+    if (nearbyCategory?.id === category.id) {
+      setNearbyCategory(null)
+      setNearbyPlaces([])
+      setNearbyStatus('idle')
+      return
+    }
+    setNearbyCategory(category)
+    setNearbyStatus('loading')
+    try {
+      const center = mapRef.current?.getCenter()
+      const loc = center ? { lat: center.lat(), lng: center.lng() } : myLocation || FALLBACK_CENTER
+      const places = await searchNearby({ category, center: loc })
+      setNearbyPlaces(places)
+      setNearbyStatus('idle')
+    } catch {
+      setNearbyPlaces([])
+      setNearbyStatus('error')
+    }
+  }
+
   // The panel collapses/expands around the map — keep Google Maps in sync with
   // its container size so it doesn't render grey bands. Debounced and just
   // triggers 'resize' (no forced re-fit) so it can't fight a user's own pan/zoom.
@@ -110,10 +150,26 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
 
   return (
     <div className="map" ref={wrapRef}>
+      <div className="map__chips">
+        {NEARBY_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`map__chip${nearbyCategory?.id === c.id ? ' map__chip--on' : ''}`}
+            onClick={() => toggleCategory(c)}
+          >
+            {c.glyph} {c.label}
+          </button>
+        ))}
+        {nearbyStatus === 'loading' && <span className="map__chipstatus">Searching…</span>}
+        {nearbyStatus === 'error' && <span className="map__chipstatus">Couldn’t load nearby places</span>}
+      </div>
+
       <GoogleMap
         mapContainerClassName="map__canvas"
         center={FALLBACK_CENTER}
         zoom={12}
+        mapTypeId={mapType}
         options={MAP_OPTIONS}
         onLoad={(m) => (mapRef.current = m)}
       >
@@ -158,7 +214,57 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
             }}
           />
         )}
+
+        {nearbyCategory &&
+          nearbyPlaces.map((p) => (
+            <Marker
+              key={p.id}
+              position={p.location}
+              title={p.name}
+              zIndex={4}
+              icon={{
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: nearbyCategory.color,
+                fillOpacity: 0.95,
+                strokeColor: '#0b1220',
+                strokeWeight: 1.5,
+              }}
+            />
+          ))}
       </GoogleMap>
+
+      <div className="map__layers">
+        <button
+          type="button"
+          className="map__ctrlbtn"
+          onClick={() => setLayersOpen((v) => !v)}
+          title="Map layers"
+          aria-label="Map layers"
+        >
+          🗺️
+        </button>
+        {layersOpen && (
+          <div className="map__layerspanel">
+            <label className="map__layerrow">
+              <input
+                type="checkbox"
+                checked={mapType === 'satellite'}
+                onChange={(e) => setMapType(e.target.checked ? 'satellite' : 'roadmap')}
+              />
+              Satellite
+            </label>
+            <label className="map__layerrow">
+              <input
+                type="checkbox"
+                checked={trafficOn}
+                onChange={(e) => setTrafficOn(e.target.checked)}
+              />
+              Traffic
+            </label>
+          </div>
+        )}
+      </div>
 
       <div className="map__controls">
         <button

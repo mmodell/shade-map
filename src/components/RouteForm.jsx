@@ -4,6 +4,7 @@ import MicButton from './MicButton'
 import { TRAVEL_MODES } from '../lib/googleDirections'
 import { formatClock } from '../lib/format'
 import { getSavedPlaces, savePlace } from '../lib/savedPlaces'
+import { getRecentPlaces, pushRecentPlace } from '../lib/recentPlaces'
 
 const WEIGHT_FIELDS = [
   { key: 'shade', label: 'Shade', hint: 'Prefer tree cover & shadow' },
@@ -36,6 +37,7 @@ export default function RouteForm({
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(() => getSavedPlaces())
+  const [recents, setRecents] = useState(() => getRecentPlaces())
   const nextStopId = useRef(0)
 
   const busy = status === 'loading'
@@ -57,6 +59,14 @@ export default function RouteForm({
     setSaved(savePlace(kind, place))
   }
 
+  function swapOD() {
+    const oldOriginAsPlace = geoOrigin ? { text: 'Current location', location: geoOrigin } : origin
+    const oldDestination = destination
+    setOrigin(oldDestination)
+    setDestination(oldOriginAsPlace)
+    setGeoOrigin(null)
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     const originValue = geoOrigin || origin?.location || origin?.text
@@ -70,6 +80,8 @@ export default function RouteForm({
       return
     }
     setError('')
+    if (!geoOrigin && origin) pushRecentPlace(origin)
+    if (destination) setRecents(pushRecentPlace(destination))
     const waypoints = stops.map((s) => s.value.location || s.value.text)
     onSubmit({
       origin: originValue,
@@ -197,6 +209,16 @@ export default function RouteForm({
         <SaveAsRow place={origin} saved={saved} onSave={saveAs} />
       )}
 
+      <button
+        type="button"
+        className="swap-btn"
+        onClick={swapOD}
+        title="Swap start and destination"
+        aria-label="Swap start and destination"
+      >
+        ⇅
+      </button>
+
       {isLoaded &&
         stops.map((stop, i) => (
           <PlaceField
@@ -227,7 +249,7 @@ export default function RouteForm({
         </button>
       )}
 
-      {(saved.home || saved.work) && (
+      {(saved.home || saved.work || recents.length > 0) && (
         <div className="quick-row">
           <span className="quick-row__label">Go to</span>
           {saved.home && (
@@ -240,6 +262,20 @@ export default function RouteForm({
               💼 Work
             </button>
           )}
+          {recents
+            .filter((p) => p.text !== saved.home?.text && p.text !== saved.work?.text)
+            .slice(0, 3)
+            .map((p) => (
+              <button
+                key={p.text}
+                type="button"
+                className="quick-chip"
+                title={p.text}
+                onClick={() => setDestination(p)}
+              >
+                🕑 {shortLabel(p.text)}
+              </button>
+            ))}
         </div>
       )}
 
@@ -364,6 +400,11 @@ function toLocalInput(date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours()
   )}:${pad(d.getMinutes())}`
+}
+
+function shortLabel(text) {
+  const first = text.split(',')[0].trim()
+  return first.length > 22 ? `${first.slice(0, 21)}…` : first
 }
 
 function fromLocalInput(value) {
