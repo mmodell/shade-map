@@ -115,6 +115,10 @@ export function routeSteps(route) {
         maneuver: s.maneuver || '',
         start: s.start_location ? { lat: s.start_location.lat(), lng: s.start_location.lng() } : null,
         end: s.end_location ? { lat: s.end_location.lat(), lng: s.end_location.lng() } : null,
+        // The step's own decoded polyline — follows the actual road curve,
+        // unlike a straight line between start/end (used to preview the step
+        // on the map before/without starting navigation).
+        path: s.path?.length ? s.path.map((p) => ({ lat: p.lat(), lng: p.lng() })) : null,
       })
     }
   }

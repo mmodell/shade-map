@@ -278,6 +278,22 @@ export default function MapComponent({
         )
       }
     }
+    // A thin dark ring between the safety outline and the shade/sun core —
+    // without it, a caution-yellow safety edge and a sun-orange shade core
+    // read as one blob instead of two distinct signals (they're both in the
+    // same warm part of the palette).
+    if (safetySegments && shadeSegments && detailPoints?.length) {
+      overlays.push(
+        new g.Polyline({
+          path: detailPoints,
+          strokeColor: '#0b1220',
+          strokeOpacity: 0.95,
+          strokeWeight: 7,
+          zIndex: 9,
+          map: mapRef.current,
+        })
+      )
+    }
     if (shadeSegments) {
       for (const seg of shadeSegments) {
         overlays.push(
@@ -286,7 +302,7 @@ export default function MapComponent({
             strokeColor: seg.color,
             strokeOpacity: 1,
             strokeWeight: 5,
-            zIndex: 9,
+            zIndex: 10,
             map: mapRef.current,
           })
         )
@@ -309,9 +325,10 @@ export default function MapComponent({
 
   // "Preview this step" — walk through the directions on the map before
   // (or without) starting live navigation. Highlights the step's stretch
-  // and frames it, using a straight start→end line as a stand-in for the
-  // exact curve (Directions gives us each step's endpoints, not its own
-  // sub-path out of the route polyline).
+  // and frames it. Uses the step's own decoded polyline (the actual
+  // road-following curve) when we have it, falling back to a straight
+  // start→end line only for steps restored from an older session that
+  // didn't persist it.
   useEffect(() => {
     if (!mapReady || !window.google || !mapRef.current) return
     focusOverlaysRef.current.forEach((o) => o.setMap(null))
@@ -320,9 +337,11 @@ export default function MapComponent({
       return
     }
     const g = window.google.maps
+    const previewPath =
+      focusedStep.path?.length >= 2 ? focusedStep.path : [focusedStep.start, focusedStep.end]
     const overlays = [
       new g.Polyline({
-        path: [focusedStep.start, focusedStep.end],
+        path: previewPath,
         strokeColor: '#f472b6',
         strokeOpacity: 1,
         strokeWeight: 7,
@@ -347,8 +366,7 @@ export default function MapComponent({
     focusOverlaysRef.current = overlays
 
     const bounds = new g.LatLngBounds()
-    bounds.extend(focusedStep.start)
-    bounds.extend(focusedStep.end)
+    previewPath.forEach((p) => bounds.extend(p))
     mapRef.current.fitBounds(bounds, 120)
     // A single point (or near-zero-length step) fitBounds barely zooms —
     // pull in closer so the highlight is actually legible.
@@ -466,19 +484,32 @@ export default function MapComponent({
 
   return (
     <div className="map" ref={wrapRef}>
-      <div className="map__chips" hidden={navigating}>
-        {NEARBY_CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`map__chip${nearbyCategory?.id === c.id ? ' map__chip--on' : ''}`}
-            onClick={() => toggleCategory(c)}
-          >
-            {c.glyph} {c.label}
-          </button>
-        ))}
-        {nearbyStatus === 'loading' && <span className="map__chipstatus">Searching…</span>}
-        {nearbyStatus === 'error' && <span className="map__chipstatus">Couldn’t load nearby places</span>}
+      <div className="map__topleft" hidden={navigating}>
+        <div className="map__chips">
+          {NEARBY_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`map__chip${nearbyCategory?.id === c.id ? ' map__chip--on' : ''}`}
+              onClick={() => toggleCategory(c)}
+            >
+              {c.glyph} {c.label}
+            </button>
+          ))}
+          {nearbyStatus === 'loading' && <span className="map__chipstatus">Searching…</span>}
+          {nearbyStatus === 'error' && <span className="map__chipstatus">Couldn’t load nearby places</span>}
+        </div>
+
+        {(shadeSegments || safetySegments) && (
+          <div className="map__legend">
+            <span><i className="map__swatch" style={{ background: SHADE_COLORS.shade }} /> Shade</span>
+            <span><i className="map__swatch" style={{ background: SHADE_COLORS.sun }} /> Sun</span>
+            <span className="map__legend-sep">·</span>
+            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.safe }} /> Safe</span>
+            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.caution }} /> Caution</span>
+            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.risk }} /> Risk</span>
+          </div>
+        )}
       </div>
 
       <div
@@ -497,17 +528,6 @@ export default function MapComponent({
           }}
         />
       </div>
-
-      {(shadeSegments || safetySegments) && (
-        <div className="map__legend" hidden={navigating}>
-          <span><i className="map__swatch" style={{ background: SHADE_COLORS.shade }} /> Shade</span>
-          <span><i className="map__swatch" style={{ background: SHADE_COLORS.sun }} /> Sun</span>
-          <span className="map__legend-sep">·</span>
-          <span><i className="map__swatch" style={{ background: SAFETY_COLORS.safe }} /> Safe</span>
-          <span><i className="map__swatch" style={{ background: SAFETY_COLORS.caution }} /> Caution</span>
-          <span><i className="map__swatch" style={{ background: SAFETY_COLORS.risk }} /> Risk</span>
-        </div>
-      )}
 
       <div className="map__layers">
         <button

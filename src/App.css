@@ -776,11 +776,9 @@
 }
 
 .map__legend {
-  position: absolute;
-  right: 12px;
-  top: 60px;
-  max-width: 60%;
-  justify-content: flex-end;
+  align-self: flex-start;
+  max-width: 100%;
+  justify-content: flex-start;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
@@ -790,6 +788,7 @@
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: 10px;
+  box-shadow: var(--shadow-sm);
   font-size: 11px;
   color: var(--text-dim);
 }
@@ -808,16 +807,26 @@
   display: inline-block;
 }
 
-.map__chips {
+/* Chips + legend stack in normal flow inside this one positioned wrapper,
+   so the legend can never land on top of (or get clipped behind) the chips
+   row above it — their combined height just grows downward instead of each
+   being placed at its own guessed pixel offset. */
+.map__topleft {
   position: absolute;
   top: 12px;
   left: 12px;
-  right: 64px;
+  right: 64px; /* keep clear of the stacked control buttons on the right */
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.map__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  z-index: 2;
 }
 .map__chip {
   padding: 7px 12px;
