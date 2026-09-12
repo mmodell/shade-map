@@ -18,6 +18,8 @@ export default function RouteForm({
   isLoaded,
   departure,
   onDepartureChange,
+  arriveBy,
+  onArriveByChange,
   weights,
   onWeightsChange,
   mode,
@@ -130,7 +132,11 @@ export default function RouteForm({
           )}
           <span className="tripbar__pt">{trip?.destText || destination?.text || 'Destination'}</span>
         </span>
-        <span className="tripbar__time">{formatClock(departure)}</span>
+        <span className="tripbar__time">
+          {trip?.arriveBy && trip?.resolvedArrival
+            ? `Arrive ${formatClock(new Date(trip.resolvedArrival))}`
+            : formatClock(departure)}
+        </span>
         <span className="tripbar__edit">Edit</span>
       </button>
     )
@@ -293,7 +299,25 @@ export default function RouteForm({
       {destination && <SaveAsRow place={destination} saved={saved} onSave={saveAs} />}
 
       <div className="form__field">
-        <label htmlFor="departure">Leaving at</label>
+        <label htmlFor="departure">{arriveBy ? 'Arrive by' : 'Leave at'}</label>
+        <div className="time-toggle" role="group" aria-label="Leave at or arrive by">
+          <button
+            type="button"
+            className={`time-toggle__btn${!arriveBy ? ' time-toggle__btn--on' : ''}`}
+            aria-pressed={!arriveBy}
+            onClick={() => onArriveByChange(false)}
+          >
+            Leave at
+          </button>
+          <button
+            type="button"
+            className={`time-toggle__btn${arriveBy ? ' time-toggle__btn--on' : ''}`}
+            aria-pressed={arriveBy}
+            onClick={() => onArriveByChange(true)}
+          >
+            Arrive by
+          </button>
+        </div>
         <div className="form__inline">
           <input
             id="departure"
@@ -302,13 +326,15 @@ export default function RouteForm({
             onChange={(e) => onDepartureChange(fromLocalInput(e.target.value))}
             required
           />
-          <button
-            type="button"
-            className="form__ghost"
-            onClick={() => onDepartureChange(new Date())}
-          >
-            Now
-          </button>
+          {!arriveBy && (
+            <button
+              type="button"
+              className="form__ghost"
+              onClick={() => onDepartureChange(new Date())}
+            >
+              Now
+            </button>
+          )}
         </div>
       </div>
 

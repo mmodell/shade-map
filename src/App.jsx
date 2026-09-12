@@ -9,6 +9,7 @@ import { requestRoutes, samplePath, routeSummary } from './lib/googleDirections'
 import { analyzeRoutes } from './lib/analyze'
 import { rankRoutes } from './lib/ranking'
 import { loadSession, saveSession } from './lib/persist'
+import { formatClock } from './lib/format'
 import './App.css'
 
 const MAPS_LIBRARIES = ['places', 'geometry']
@@ -27,8 +28,19 @@ export default function App() {
   // One-time restore of the last search, so a page refresh doesn't lose it.
   const restored = useMemo(() => loadSession(), [])
 
+  // `departure` is whatever's typed into the datetime-local input — its
+  // meaning depends on `arriveBy`. The actual instant used for shade/weather
+  // (`resolvedDeparture`) is only known after a search resolves it, since
+  // "arrive by" has to back-calculate from a route's duration.
   const [departure, setDeparture] = useState(() =>
     restored?.departure ? new Date(restored.departure) : roundToNextQuarterHour(new Date())
+  )
+  const [arriveBy, setArriveBy] = useState(() => restored?.arriveBy || false)
+  const [resolvedDeparture, setResolvedDeparture] = useState(() =>
+    restored?.resolvedDeparture ? new Date(restored.resolvedDeparture) : departure
+  )
+  const [resolvedArrival, setResolvedArrival] = useState(() =>
+    restored?.resolvedArrival ? new Date(restored.resolvedArrival) : null
   )
   const [weights, setWeights] = useState(() => restored?.weights || DEFAULT_WEIGHTS)
   const [mode, setMode] = useState(() => restored?.mode || 'WALKING')
@@ -55,6 +67,9 @@ export default function App() {
       weights,
       mode,
       departure: departure.toISOString(),
+      arriveBy,
+      resolvedDeparture: resolvedDeparture.toISOString(),
+      resolvedArrival: resolvedArrival ? resolvedArrival.toISOString() : null,
       status,
       trip,
       analyzed,
@@ -63,14 +78,13 @@ export default function App() {
       paths: [...pathsRef.current.entries()],
       steps: [...stepsRef.current.entries()],
     })
-  }, [weights, mode, departure, status, trip, analyzed, meta, selectedId])
+  }, [weights, mode, departure, arriveBy, resolvedDeparture, resolvedArrival, status, trip, analyzed, meta, selectedId])
 
   const runSearch = useCallback(
     async ({ origin, destination, waypoints, mode: reqMode, originText, destText, stopCount }) => {
       if (!origin || !destination) return
       setStatus('loading')
       setErrorMsg('')
-      setTrip({ originText, destText, stopCount })
       try {
         const result = await requestRoutes({ origin, destination, waypoints, mode: reqMode, departure })
         const routes = result.routes.slice(0, MAX_ROUTES)
@@ -97,7 +111,21 @@ export default function App() {
         pathsRef.current = paths
         stepsRef.current = steps
 
-        const analysis = await analyzeRoutes({ candidates, departure })
+        // Directions has no native "arrive by" — back-calculate from the
+        // primary route's duration. One pass, not iterative: for driving
+        // this reuses the traffic estimate anchored on the arrival time
+        // itself, which is already a reasonable stand-in for the actual
+        // departure's traffic.
+        const primaryDurationSeconds =
+          candidates[0]?.durationInTrafficSeconds || candidates[0]?.durationSeconds || 0
+        const actualDeparture = arriveBy
+          ? new Date(departure.getTime() - primaryDurationSeconds * 1000)
+          : departure
+        const actualArrival = new Date(actualDeparture.getTime() + primaryDurationSeconds * 1000)
+        setResolvedDeparture(actualDeparture)
+        setResolvedArrival(actualArrival)
+
+        const analysis = await analyzeRoutes({ candidates, departure: actualDeparture })
         setAnalyzed(analysis.routes)
         setMeta({
           degraded: analysis.degraded,
@@ -108,12 +136,20 @@ export default function App() {
         setSelectedId(null)
         setStatus('done')
         setFormOpen(false)
+        setTrip({
+          originText,
+          destText,
+          stopCount,
+          arriveBy,
+          resolvedDeparture: actualDeparture.toISOString(),
+          resolvedArrival: actualArrival.toISOString(),
+        })
       } catch (err) {
         setErrorMsg(String(err.message || err))
         setStatus('error')
       }
     },
-    [departure]
+    [departure, arriveBy]
   )
 
   if (loadError) {
@@ -145,6 +181,8 @@ export default function App() {
             isLoaded={isLoaded}
             departure={departure}
             onDepartureChange={setDeparture}
+            arriveBy={arriveBy}
+            onArriveByChange={setArriveBy}
             weights={weights}
             onWeightsChange={setWeights}
             mode={mode}
@@ -174,6 +212,14 @@ export default function App() {
             </p>
           )}
 
+          {arriveBy && status === 'done' && resolvedArrival && (
+            <p className="app__notice">
+              🕑 Leave by <strong>{formatClock(resolvedDeparture)}</strong> to arrive by{' '}
+              <strong>{formatClock(resolvedArrival)}</strong> (based on the top route — other
+              options may take a little longer or shorter).
+            </p>
+          )}
+
           {hasResults && (
             <>
               <RouteList
@@ -200,7 +246,7 @@ export default function App() {
             <WeatherTimeline
               weather={meta.weather}
               shade={selected.shade}
-              departure={departure}
+              departure={resolvedDeparture}
               durationSeconds={selected.durationInTrafficSeconds || selected.durationSeconds}
             />
           )}
