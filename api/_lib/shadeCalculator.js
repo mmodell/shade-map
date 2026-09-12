@@ -1,14 +1,10 @@
 import SunCalc from 'suncalc'
-import {
-  projector,
-  pointInRing,
-  distToPolyline,
-  pathLengthMeters,
-} from './geo.js'
+import { projector, pointInRing, distToPolyline } from './geo.js'
 import { estimateUvIndex } from './sun.js'
 
 const TREE_RADIUS_M = 9
 const GREEN_LINE_RADIUS_M = 10
+const BUILDING_RADIUS_M = 25
 
 /* Heuristic shade estimate for one route.
    - canopy shade: share of the path that passes through parks / woods / tree rows
@@ -21,26 +17,30 @@ export function computeShade({ points, osm, date }) {
   const rings = osm.greenAreas.map((ring) => ring.map(project))
   const lines = osm.greenLines.map((line) => line.map(project))
   const trees = osm.trees.map(project)
+  const buildings = (osm.buildings || []).map(project)
 
+  // osm may now cover several route alternatives at once (one shared
+  // Overpass fetch instead of one per route — see overpass.js), so both
+  // shares below are measured per-point against THIS route's own path
+  // rather than anything bbox-wide, and stay correct regardless of how much
+  // extra area the shared fetch pulled in for the other alternatives.
   let greenHits = 0
+  let buildingHits = 0
   for (const p of points) {
     const pp = project(p)
-    if (rings.some((r) => pointInRing(pp, r))) {
+    if (
+      rings.some((r) => pointInRing(pp, r)) ||
+      lines.some((l) => distToPolyline(pp, l) <= GREEN_LINE_RADIUS_M) ||
+      trees.some((t) => Math.hypot(pp.x - t.x, pp.y - t.y) <= TREE_RADIUS_M)
+    ) {
       greenHits++
-      continue
     }
-    if (lines.some((l) => distToPolyline(pp, l) <= GREEN_LINE_RADIUS_M)) {
-      greenHits++
-      continue
-    }
-    if (trees.some((t) => Math.hypot(pp.x - t.x, pp.y - t.y) <= TREE_RADIUS_M)) {
-      greenHits++
+    if (buildings.some((b) => Math.hypot(pp.x - b.x, pp.y - b.y) <= BUILDING_RADIUS_M)) {
+      buildingHits++
     }
   }
   const greenCoverage = points.length ? greenHits / points.length : 0
-
-  const km = Math.max(0.05, pathLengthMeters(points) / 1000)
-  const builtUpFactor = clamp01(osm.buildingCount / (km * 120))
+  const builtUpFactor = points.length ? buildingHits / points.length : 0
 
   const mid = points[Math.floor(points.length / 2)] || anchor
   const sun = SunCalc.getPosition(date, mid.lat, mid.lng)

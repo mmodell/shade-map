@@ -16,7 +16,9 @@ const HIGHWAY_QUERY =
   'way["highway"~"footway|path|pedestrian|steps|cycleway|living_street|residential|service|unclassified|tertiary|secondary|primary|track"]'
 
 /* Returns { greenAreas: [[latlng]], greenLines: [[latlng]], trees: [latlng],
-   highways: [{ path:[latlng], tags }], buildingCount:int } for the route bbox. */
+   highways: [{ path:[latlng], tags }], buildings: [latlng] } for the given
+   bbox. `points` can span several route alternatives at once — pass their
+   combined points to fetch one shared dataset instead of one per route. */
 export async function fetchOsmFeatures(points) {
   const b = bbox(points, 70)
   const box = `${b.south},${b.west},${b.north},${b.east}`
@@ -29,7 +31,7 @@ export async function fetchOsmFeatures(points) {
 );
 out geom tags;
 way["building"](${box});
-out count;`
+out center;`
 
   const json = await runQuery(q)
   return parse(json)
@@ -59,14 +61,17 @@ function parse(json) {
   const greenLines = []
   const trees = []
   const highways = []
-  let buildingCount = 0
+  const buildings = []
 
   for (const el of json.elements || []) {
-    if (el.type === 'count') {
-      buildingCount = Number(el.tags?.ways || el.tags?.total || 0)
+    const tags = el.tags || {}
+    // Buildings come back from the separate `out center;` clause — a
+    // computed centroid instead of full geometry, since we only need a
+    // point to test route proximity against, not the building's footprint.
+    if (el.type === 'way' && el.center && !el.geometry) {
+      buildings.push({ lat: el.center.lat, lng: el.center.lon })
       continue
     }
-    const tags = el.tags || {}
     if (el.type === 'node' && tags.natural === 'tree') {
       trees.push({ lat: el.lat, lng: el.lon })
       continue
@@ -83,5 +88,5 @@ function parse(json) {
     }
   }
 
-  return { greenAreas, greenLines, trees, highways, buildingCount }
+  return { greenAreas, greenLines, trees, highways, buildings }
 }

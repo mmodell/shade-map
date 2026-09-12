@@ -7,7 +7,7 @@ import { getWeather } from './_lib/weatherService.js'
 import { getStateCrimeContext } from './_lib/crimeService.js'
 
 const MAX_ROUTES = 4
-const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildingCount: 0 }
+const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildings: [] }
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -25,37 +25,41 @@ export default async function handler(req, res) {
 
   const date = parseDate(body?.departureISO)
   const units = process.env.WEATHER_UNITS || 'imperial'
-  const routes = Array.isArray(body?.routes) ? body.routes.slice(0, MAX_ROUTES) : []
-  if (!routes.length) return res.status(400).json({ error: 'No routes provided' })
+  const rawRoutes = Array.isArray(body?.routes) ? body.routes.slice(0, MAX_ROUTES) : []
+  if (!rawRoutes.length) return res.status(400).json({ error: 'No routes provided' })
 
-  // Crime context is state-level, so it's the same for every route in this
-  // search — fetch it once from the first route's midpoint rather than once
-  // per route.
-  let crime = null
-  try {
-    const ref = sanitizePoints(routes[0].points)
-    const refMid = ref[Math.floor(ref.length / 2)] || ref[0]
-    if (refMid) crime = await getStateCrimeContext({ lat: refMid.lat, lng: refMid.lng })
-  } catch {
-    crime = null
-  }
+  const routes = rawRoutes.map((r) => ({ id: r.id, points: sanitizePoints(r.points) }))
+  const refPoints = routes[0]?.points || []
+  const refMid = refPoints[Math.floor(refPoints.length / 2)] || refPoints[0] || null
+  const allPoints = routes.flatMap((r) => r.points)
 
-  const analyzed = []
-  for (const route of routes) {
-    const points = sanitizePoints(route.points)
+  // Crime, weather and OSM (tree/park/sidewalk) data are each independent of
+  // one another, and — for OSM — no longer fetched once per route
+  // alternative. A single combined bbox covering every alternative replaces
+  // what used to be a separate Overpass call (up to 3 mirrors x 25s timeout
+  // each) per route, which could turn a 4-route search into minutes of
+  // serial retries on a bad Overpass night. Per-route shade/safety numbers
+  // stay correct off this shared dataset because they're computed by
+  // checking each route's own points against it (see shadeCalculator.js),
+  // not by anything that depends on the fetch's bbox size.
+  const [crime, weather, osmResult] = await Promise.all([
+    refMid
+      ? getStateCrimeContext({ lat: refMid.lat, lng: refMid.lng }).catch(() => null)
+      : Promise.resolve(null),
+    refMid ? getWeather({ lat: refMid.lat, lng: refMid.lng, units }).catch(() => null) : Promise.resolve(null),
+    allPoints.length
+      ? fetchOsmFeatures(allPoints)
+          .then((osm) => ({ osm, ok: true }))
+          .catch(() => ({ osm: EMPTY_OSM, ok: false }))
+      : Promise.resolve({ osm: EMPTY_OSM, ok: false }),
+  ])
+  const { osm, ok: osmOk } = osmResult
+
+  const analyzed = routes.map(({ id, points }) => {
     if (points.length < 2) {
-      analyzed.push({ id: route.id, shade: nightSafeDefault(), safety: { score: 0.5 }, lighting: null })
-      continue
+      return { id, shade: nightSafeDefault(), safety: { score: 0.5 }, lighting: null }
     }
     const mid = points[Math.floor(points.length / 2)]
-
-    let osm = EMPTY_OSM
-    let osmOk = true
-    try {
-      osm = await fetchOsmFeatures(points)
-    } catch {
-      osmOk = false
-    }
 
     const matched = matchHighways(points, osm.highways)
     const shade = computeShade({ points, osm, date })
@@ -66,17 +70,8 @@ export default async function handler(req, res) {
     const lighting = computeLighting({ matchedTags: matched, date, lat: mid.lat, lng: mid.lng })
     const safety = computeSafety({ matchedTags: matched, lighting, date, lat: mid.lat, lng: mid.lng, crime })
 
-    analyzed.push({ id: route.id, shade, safety, lighting })
-  }
-
-  let weather = null
-  try {
-    const ref = sanitizePoints(routes[0].points)
-    const mid = ref[Math.floor(ref.length / 2)] || ref[0]
-    if (mid) weather = await getWeather({ lat: mid.lat, lng: mid.lng, units })
-  } catch {
-    weather = null
-  }
+    return { id, shade, safety, lighting }
+  })
 
   res.setHeader('Cache-Control', 'no-store')
   return res.status(200).json({ routes: analyzed, weather, crime, analyzedAt: new Date().toISOString() })
