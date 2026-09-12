@@ -7,43 +7,63 @@
    rather than thrown — this integration is best-effort against a public API
    whose exact response shape we can't pin down without a live key. */
 
+import { cached } from './cache.js'
+
 const FBI_BASE = 'https://api.usa.gov/crime/fbi/cde'
 const FALLBACK_NATIONAL_RATE = 380 // per 100k, rough recent US violent-crime rate
+
+// FBI estimates only change once a year and are keyed off a whole state, so
+// once we know a request's state the crime figures cache for a long time.
+// The state lookup itself is also cached (coarse grid, since state borders
+// don't move) — Nominatim's usage policy asks callers to cache reverse-geocode
+// results and not hit it more than once a second, which a per-search call
+// here would otherwise violate for repeat use in the same area.
+const CRIME_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const GEOCODE_GRID_DEG = 0.1 // ~11km — plenty coarse for a state-level lookup
+const GEOCODE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 export async function getStateCrimeContext({ lat, lng }) {
   const key = process.env.FBI_CRIME_API_KEY
   if (!key) return null
 
   try {
-    const stateAbbr = await reverseGeocodeState(lat, lng)
+    const gLat = Math.round(lat / GEOCODE_GRID_DEG) * GEOCODE_GRID_DEG
+    const gLng = Math.round(lng / GEOCODE_GRID_DEG) * GEOCODE_GRID_DEG
+    const stateAbbr = await cached(`state-geocode:${gLat}:${gLng}`, GEOCODE_TTL_MS, () =>
+      reverseGeocodeState(lat, lng)
+    )
     if (!stateAbbr) return null
 
-    const to = new Date().getFullYear() - 1 // FBI data lags a year or so
-    const from = to - 3
-    const [stateRows, nationalRows] = await Promise.all([
-      safeJson(`${FBI_BASE}/estimate/state/${stateAbbr}/${from}/${to}?API_KEY=${key}`),
-      safeJson(`${FBI_BASE}/estimate/national/${from}/${to}?API_KEY=${key}`),
-    ])
-
-    const stateRow = latestValidRow(stateRows)
-    if (!stateRow) return null
-    const stateRate = violentRatePer100k(stateRow)
-    if (stateRate == null) return null
-
-    const nationalRow = latestValidRow(nationalRows)
-    const nationalRate = (nationalRow && violentRatePer100k(nationalRow)) || FALLBACK_NATIONAL_RATE
-
-    const ratio = stateRate / nationalRate
-    return {
-      state: stateAbbr,
-      year: stateRow.year ?? to,
-      violentRatePer100k: Math.round(stateRate),
-      nationalRatePer100k: Math.round(nationalRate),
-      ratio: Math.round(ratio * 100) / 100,
-      label: describeRatio(ratio),
-    }
+    return await cached(`crime:${stateAbbr}`, CRIME_TTL_MS, () => fetchStateCrime(stateAbbr, key))
   } catch {
     return null
+  }
+}
+
+async function fetchStateCrime(stateAbbr, key) {
+  const to = new Date().getFullYear() - 1 // FBI data lags a year or so
+  const from = to - 3
+  const [stateRows, nationalRows] = await Promise.all([
+    safeJson(`${FBI_BASE}/estimate/state/${stateAbbr}/${from}/${to}?API_KEY=${key}`),
+    safeJson(`${FBI_BASE}/estimate/national/${from}/${to}?API_KEY=${key}`),
+  ])
+
+  const stateRow = latestValidRow(stateRows)
+  if (!stateRow) return null
+  const stateRate = violentRatePer100k(stateRow)
+  if (stateRate == null) return null
+
+  const nationalRow = latestValidRow(nationalRows)
+  const nationalRate = (nationalRow && violentRatePer100k(nationalRow)) || FALLBACK_NATIONAL_RATE
+
+  const ratio = stateRate / nationalRate
+  return {
+    state: stateAbbr,
+    year: stateRow.year ?? to,
+    violentRatePer100k: Math.round(stateRate),
+    nationalRatePer100k: Math.round(nationalRate),
+    ratio: Math.round(ratio * 100) / 100,
+    label: describeRatio(ratio),
   }
 }
 

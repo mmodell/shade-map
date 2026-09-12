@@ -1,4 +1,12 @@
 import { bbox } from './geo.js'
+import { cached } from './cache.js'
+
+// Snap the query bbox outward to this grid before fetching/caching, so two
+// searches in the same neighborhood reuse one Overpass result instead of
+// each firing its own — always rounds south/west down and north/east up, so
+// the snapped box is a superset of what was actually asked for.
+const GRID_DEG = 0.005 // ~550m of latitude
+const OSM_TTL_MS = 24 * 60 * 60 * 1000 // building/tree/road data barely changes day to day
 
 const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -22,9 +30,11 @@ const HIGHWAY_QUERY =
    route. `heightM` is real when OSM has height/building:levels tagged,
    otherwise a flat default — see shadeCalculator.js's shadow casting. */
 export async function fetchOsmFeatures(points) {
-  const b = bbox(points, 70)
+  const b = snapBbox(bbox(points, 70))
   const box = `${b.south},${b.west},${b.north},${b.east}`
-  const q = `[out:json][timeout:25];
+
+  return cached(`osm:${box}`, OSM_TTL_MS, async () => {
+    const q = `[out:json][timeout:25];
 (
   ${GREEN_AREA_QUERY.map((s) => `${s}(${box});`).join('\n  ')}
   ${GREEN_LINE_QUERY.map((s) => `${s}(${box});`).join('\n  ')}
@@ -35,8 +45,18 @@ out geom tags;
 way["building"](${box});
 out tags center;`
 
-  const json = await runQuery(q)
-  return parse(json)
+    const json = await runQuery(q)
+    return parse(json)
+  })
+}
+
+function snapBbox(b) {
+  return {
+    south: Math.floor(b.south / GRID_DEG) * GRID_DEG,
+    west: Math.floor(b.west / GRID_DEG) * GRID_DEG,
+    north: Math.ceil(b.north / GRID_DEG) * GRID_DEG,
+    east: Math.ceil(b.east / GRID_DEG) * GRID_DEG,
+  }
 }
 
 async function runQuery(q) {
