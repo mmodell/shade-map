@@ -7,9 +7,9 @@ import { getSavedPlaces, savePlace } from '../lib/savedPlaces'
 import { getRecentPlaces, pushRecentPlace } from '../lib/recentPlaces'
 
 const WEIGHT_FIELDS = [
-  { key: 'shade', label: 'Shade', hint: 'Prefer tree cover & shadow' },
-  { key: 'distance', label: 'Directness', hint: 'Prefer shorter routes' },
-  { key: 'safety', label: 'Safety', hint: 'Prefer lit paths & sidewalks' },
+  { key: 'shade', label: 'Shade', minLabel: 'More sun exposure', maxLabel: 'No sun exposure' },
+  { key: 'distance', label: 'Directness', minLabel: 'Longer route', maxLabel: 'Shortest route' },
+  { key: 'safety', label: 'Safety', minLabel: 'Dangerous', maxLabel: 'Safe' },
 ]
 
 const MAX_STOPS = 6
@@ -349,7 +349,7 @@ export default function RouteForm({
           </span>
         </summary>
         <fieldset className="form__weights">
-          {WEIGHT_FIELDS.map(({ key, label, hint }) => {
+          {WEIGHT_FIELDS.map(({ key, label, minLabel, maxLabel }) => {
             const isShadeAtNight = key === 'shade' && nightMode
             return (
               <div className={`weight${isShadeAtNight ? ' weight--dim' : ''}`} key={key}>
@@ -366,11 +366,16 @@ export default function RouteForm({
                   onChange={(e) =>
                     onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
                   }
-                  aria-label={`${label} priority`}
+                  aria-label={`${label} priority, from ${minLabel} to ${maxLabel}`}
                 />
-                <span className="weight__hint">
-                  {isShadeAtNight ? '🌙 Not relevant after dark — try Safety instead' : hint}
-                </span>
+                {isShadeAtNight ? (
+                  <span className="weight__hint">🌙 Not relevant after dark — try Safety instead</span>
+                ) : (
+                  <div className="weight__scale">
+                    <span>{minLabel}</span>
+                    <span>{maxLabel}</span>
+                  </div>
+                )}
               </div>
             )
           })}
