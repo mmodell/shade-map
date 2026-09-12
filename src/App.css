@@ -11,16 +11,29 @@
 }
 .app__header h1 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 20px;
-  letter-spacing: 0.2px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
 }
 .app__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(252, 211, 77, 0.22), rgba(34, 197, 94, 0.16));
   color: var(--sun);
+  font-size: 15px;
 }
 .app__tag {
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   color: var(--text-dim);
   font-size: 13px;
+  letter-spacing: 0.1px;
 }
 
 /* Compact mode: after routes are found, shrink chrome so the map dominates. */
@@ -29,6 +42,12 @@
 }
 .app--compact .app__header h1 {
   font-size: 16px;
+}
+.app--compact .app__mark {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  border-radius: 7px;
 }
 .app--compact .app__tag {
   display: none;
@@ -64,6 +83,7 @@
   background: #1e293b;
   border: 1px solid var(--border);
   border-radius: 10px;
+  box-shadow: var(--shadow-sm);
   font-size: 12.5px;
   color: var(--text-dim);
 }
@@ -109,10 +129,14 @@
   color: var(--text-dim);
   font-size: 13px;
 }
+.modes__btn:hover {
+  border-color: var(--accent-dim);
+}
 .modes__btn--on {
   background: var(--bg-elevated);
   border-color: var(--accent);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- collapsed trip bar ---------- */
@@ -125,8 +149,12 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
+  box-shadow: var(--shadow-sm);
   color: inherit;
   text-align: left;
+}
+.tripbar:hover {
+  border-color: var(--accent-dim);
 }
 .tripbar__mode {
   font-size: 16px;
@@ -380,6 +408,7 @@
 .form__weights-wrap {
   border: 1px solid var(--border);
   border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
 .form__weights-wrap > summary {
   padding: 8px 12px;
@@ -461,15 +490,22 @@
 }
 
 .form__submit {
-  padding: 11px;
-  background: var(--accent);
+  padding: 12px;
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-dim));
   color: #052e16;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 14.5px;
   border: none;
   border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.32);
+}
+.form__submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.42);
 }
 .form__submit:disabled {
   opacity: 0.5;
+  box-shadow: none;
 }
 
 /* ---------- route list ---------- */
@@ -493,10 +529,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.route:hover {
+  box-shadow: var(--shadow-md);
 }
 .route--selected {
   border-color: var(--route-color);
-  box-shadow: 0 0 0 1px var(--route-color);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--route-color);
 }
 .route__head {
   display: flex;
@@ -550,6 +590,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 .steps > summary {
   padding: 11px 12px;
@@ -835,15 +876,20 @@
   margin: 10px 0 0;
   padding: 12px;
   width: 100%;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-dim));
   color: #052e16;
   font-weight: 700;
   border: none;
   border-radius: 12px;
   font-size: 14px;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.32);
+}
+.nav__start:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 .nav__start:disabled {
   opacity: 0.5;
+  box-shadow: none;
 }
 
 /* ---------- live navigation overlay ---------- */
@@ -941,6 +987,7 @@
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: 14px;
+  box-shadow: var(--shadow-lg);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;

@@ -271,7 +271,8 @@ export default function App() {
     <div className={`app${!formOpen ? ' app--compact' : ''}`}>
       <header className="app__header">
         <h1>
-          <span className="app__mark" aria-hidden="true">☀︎</span> Shade Map
+          <span className="app__mark" aria-hidden="true">☀︎</span>
+          <span>Shade Map</span>
         </h1>
         <p className="app__tag">Walking, biking &amp; driving routes ranked by shade &amp; comfort</p>
       </header>
