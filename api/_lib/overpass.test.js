@@ -18,8 +18,12 @@ describe('fetchOsmFeatures caching', () => {
 
   it('reuses one Overpass call for two nearby point sets in the same grid cell', async () => {
     // Random-ish base so this test's cache keys never collide with another
-    // test run's, since the cache module is a shared singleton.
-    const base = 10 + Math.random() * 30
+    // test run's, since the cache module is a shared singleton — but placed
+    // dead-center in a 0.005deg grid cell (not just anywhere in [10,40)), so
+    // an unlucky roll landing within the bbox padding of a cell boundary
+    // can't flakily snap `a` and `b` to different cells.
+    const GRID = 0.005
+    const base = 10 + Math.floor(Math.random() * 1000) * GRID + GRID / 2
     const a = [{ lat: base, lng: base }]
     const b = [{ lat: base + 0.0002, lng: base + 0.0002 }] // well within one 0.005deg grid cell
 
