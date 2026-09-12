@@ -22,6 +22,8 @@ export default function RouteForm({
   onArriveByChange,
   weights,
   onWeightsChange,
+  avoidRisk,
+  onAvoidRiskChange,
   mode,
   onModeChange,
   status,
@@ -373,6 +375,17 @@ export default function RouteForm({
             )
           })}
         </fieldset>
+        <label className="avoid-risk">
+          <input
+            type="checkbox"
+            checked={avoidRisk}
+            onChange={(e) => onAvoidRiskChange(e.target.checked)}
+          />
+          <span>
+            <strong>🚫 Avoid risky stretches</strong>
+            <small>Sorts routes by least exposure to busy, unlit, sidewalk-free roads first — overrides the sliders above.</small>
+          </span>
+        </label>
       </details>
 
       {error && <p className="form__err">{error}</p>}

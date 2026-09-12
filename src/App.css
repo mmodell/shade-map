@@ -411,6 +411,32 @@
   flex-direction: column;
   gap: 9px;
 }
+.avoid-risk {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+.avoid-risk input {
+  margin-top: 3px;
+  accent-color: var(--danger);
+}
+.avoid-risk span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+}
+.avoid-risk small {
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.app__notice--risk {
+  border-color: var(--danger);
+}
 .weight__row {
   display: flex;
   justify-content: space-between;
@@ -620,6 +646,10 @@
 }
 .steps__shade {
   color: var(--sun);
+}
+.steps__risk {
+  color: var(--danger);
+  font-weight: 600;
 }
 .steps__dist {
   color: var(--text-dim);

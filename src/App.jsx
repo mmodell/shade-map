@@ -44,6 +44,7 @@ export default function App() {
     restored?.resolvedArrival ? new Date(restored.resolvedArrival) : null
   )
   const [weights, setWeights] = useState(() => restored?.weights || DEFAULT_WEIGHTS)
+  const [avoidRisk, setAvoidRisk] = useState(() => restored?.avoidRisk || false)
   const [mode, setMode] = useState(() => restored?.mode || 'WALKING')
   const [status, setStatus] = useState(() => restored?.status || 'idle') // idle | loading | done | error
   const [errorMsg, setErrorMsg] = useState('')
@@ -58,7 +59,10 @@ export default function App() {
   const pathsRef = useRef(new Map(restored?.paths || []))
   const stepsRef = useRef(new Map(restored?.steps || []))
 
-  const ranked = useMemo(() => rankRoutes(analyzed, weights), [analyzed, weights])
+  const ranked = useMemo(
+    () => rankRoutes(analyzed, weights, avoidRisk),
+    [analyzed, weights, avoidRisk]
+  )
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
   const selectedSteps = selected ? stepsRef.current.get(selected.id) : null
   const focusedStep =
@@ -79,6 +83,7 @@ export default function App() {
   useEffect(() => {
     saveSession({
       weights,
+      avoidRisk,
       mode,
       departure: departure.toISOString(),
       arriveBy,
@@ -92,7 +97,20 @@ export default function App() {
       paths: [...pathsRef.current.entries()],
       steps: [...stepsRef.current.entries()],
     })
-  }, [weights, mode, departure, arriveBy, resolvedDeparture, resolvedArrival, status, trip, analyzed, meta, selectedId])
+  }, [
+    weights,
+    avoidRisk,
+    mode,
+    departure,
+    arriveBy,
+    resolvedDeparture,
+    resolvedArrival,
+    status,
+    trip,
+    analyzed,
+    meta,
+    selectedId,
+  ])
 
   const runSearch = useCallback(
     async ({ origin, destination, waypoints, mode: reqMode, originText, destText, stopCount }) => {
@@ -200,6 +218,8 @@ export default function App() {
             onArriveByChange={setArriveBy}
             weights={weights}
             onWeightsChange={setWeights}
+            avoidRisk={avoidRisk}
+            onAvoidRiskChange={setAvoidRisk}
             mode={mode}
             onModeChange={setMode}
             status={status}
@@ -224,6 +244,13 @@ export default function App() {
             <p className="app__notice app__notice--crime">
               📊 {meta.crime.state} violent crime is {meta.crime.label} (FBI, {meta.crime.year}) —
               a statewide figure, not specific to this route.
+            </p>
+          )}
+
+          {avoidRisk && status === 'done' && (
+            <p className="app__notice app__notice--risk">
+              🚫 Avoiding risky stretches — routes are sorted by the least exposure to busy,
+              unlit, sidewalk-free roads first, ahead of your shade/distance/safety sliders.
             </p>
           )}
 
@@ -256,6 +283,8 @@ export default function App() {
                 <RouteSteps
                   steps={selectedSteps}
                   shade={selected.shade}
+                  safety={selected.safety}
+                  points={selected.points}
                   focusedIndex={focusedStepIndex}
                   onFocusStep={setFocusedStepIndex}
                 />
