@@ -15,9 +15,24 @@ const BIG_ROADS = new Set(['secondary', 'primary', 'trunk'])
    - how much runs alongside a big road with no sidewalk
    - at night, how much of it is lit */
 export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) {
+  const sun = SunCalc.getPosition(date, lat, lng)
+  const altitudeDeg = (sun.altitude * 180) / Math.PI
+  const isNight = altitudeDeg < -6
+
+  // Per-point classification for the map's route outline — kept aligned
+  // with `matchedTags` (which has one entry, possibly null, per input
+  // point), unlike the `matched` array below which drops the nulls for the
+  // aggregate ratios.
+  const pointSafety = matchedTags.map((tags) => classifyPoint(tags, isNight))
+
   const matched = matchedTags.filter(Boolean)
   if (!matched.length) {
-    return { score: 0.5, note: 'No path data nearby — treating as neutral.', crime: crime || null }
+    return {
+      score: 0.5,
+      note: 'No path data nearby — treating as neutral.',
+      crime: crime || null,
+      pointSafety,
+    }
   }
 
   let pedestrianFriendly = 0
@@ -30,10 +45,6 @@ export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) 
   }
   const pedShare = pedestrianFriendly / matched.length
   const bigRoadShare = exposedBigRoad / matched.length
-
-  const sun = SunCalc.getPosition(date, lat, lng)
-  const altitudeDeg = (sun.altitude * 180) / Math.PI
-  const isNight = altitudeDeg < -6
 
   let score
   if (isNight) {
@@ -64,7 +75,26 @@ export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) 
     bigRoadShare: round2(bigRoadShare),
     note: notes.join(' · ') || null,
     crime: crime || null,
+    pointSafety,
   }
+}
+
+/* One point's classification for the map's route outline — the same
+   sidewalk/road-type/lighting signal as the aggregate score above, just
+   evaluated locally instead of averaged over the whole route. */
+function classifyPoint(tags, isNight) {
+  if (!tags) return 'caution' // no matched way nearby — unknown, not "unsafe"
+  const hw = tags.highway
+  const hasSidewalk = ['both', 'left', 'right', 'yes', 'separate'].includes(tags.sidewalk)
+  const pedestrianFriendly = PEDESTRIAN_HIGHWAYS.has(hw) || hasSidewalk
+  const exposedBigRoad = BIG_ROADS.has(hw) && !hasSidewalk
+  const lit = tags.lit === 'yes' || tags.lit === '24/7'
+  const unlit = tags.lit === 'no'
+
+  if (exposedBigRoad) return 'risk'
+  if (isNight && unlit && !pedestrianFriendly) return 'risk'
+  if (pedestrianFriendly && (!isNight || lit)) return 'safe'
+  return 'caution'
 }
 
 const round2 = (n) => Math.round(n * 100) / 100

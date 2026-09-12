@@ -541,6 +541,48 @@
   flex-direction: column;
   gap: 8px;
 }
+.steps__preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 8px;
+}
+.steps__pvbtn {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 11px;
+}
+.steps__pvlabel {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.steps__pvclear {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11.5px;
+  padding: 0;
+}
+.steps__item--clickable {
+  cursor: pointer;
+}
+.steps__item--clickable:hover {
+  background: rgba(148, 163, 184, 0.1);
+}
+.steps__item--focused {
+  background: rgba(56, 189, 248, 0.14);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
 .steps__voice {
   padding: 0 12px 8px;
 }
@@ -597,10 +639,26 @@
 }
 
 /* ---------- map ---------- */
-.map,
+.map {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden; /* clips .map__rotate's oversize when it's spun off-axis */
+}
 .map__canvas {
   width: 100%;
   height: 100%;
+}
+/* 150%-oversized and centered so a heading-up rotation (any angle) still
+   fully covers the container — a plain 100% layer would show empty
+   triangles at the corners once rotated. */
+.map__rotate {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  height: 150%;
+  transition: transform 0.25s linear;
 }
 .map--loading {
   display: flex;
@@ -633,6 +691,44 @@
 .map__ctrlbtn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+.map__ctrlbtn--on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.map__legend {
+  position: absolute;
+  right: 12px;
+  top: 60px;
+  max-width: 60%;
+  justify-content: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.map__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.map__legend-sep {
+  color: var(--border);
+}
+.map__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .map__chips {

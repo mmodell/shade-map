@@ -8,7 +8,7 @@ const MIN_STEP_METERS = 35 // shorter than this, "which side" isn't meaningful
    playback (Web Speech API — no key, built into the browser). Each
    straight-enough step is also annotated with which side of the street is
    shaded, from the segment's bearing vs. the route's sun azimuth. */
-export default function RouteSteps({ steps, shade }) {
+export default function RouteSteps({ steps, shade, focusedIndex, onFocusStep }) {
   const [playingIndex, setPlayingIndex] = useState(null) // index while speaking, or null
   const [mode, setMode] = useState('idle') // idle | playing-all | playing-one
   const stopRequested = useRef(false)
@@ -74,12 +74,43 @@ export default function RouteSteps({ steps, shade }) {
   }
 
   const supported = ttsSupported()
+  const hasFocus = focusedIndex != null
+  const canFocus = typeof onFocusStep === 'function'
+
+  function focus(i) {
+    if (!canFocus) return
+    onFocusStep(i === focusedIndex ? null : i) // click again to clear
+  }
+  function step(delta) {
+    if (!canFocus) return
+    const next = hasFocus ? focusedIndex + delta : delta > 0 ? 0 : annotated.length - 1
+    onFocusStep(Math.max(0, Math.min(annotated.length - 1, next)))
+  }
 
   return (
-    <details className="steps">
+    <details className="steps" open={hasFocus || undefined}>
       <summary>
         Directions <span className="steps__count">{steps.length} steps</span>
       </summary>
+
+      {canFocus && (
+        <div className="steps__preview">
+          <button type="button" className="steps__pvbtn" onClick={() => step(-1)} aria-label="Previous step">
+            ◀
+          </button>
+          <span className="steps__pvlabel">
+            {hasFocus ? `Previewing step ${focusedIndex + 1} of ${annotated.length}` : 'Tap a step to preview it on the map'}
+          </span>
+          <button type="button" className="steps__pvbtn" onClick={() => step(1)} aria-label="Next step">
+            ▶
+          </button>
+          {hasFocus && (
+            <button type="button" className="steps__pvclear" onClick={() => onFocusStep(null)}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {supported && (
         <div className="steps__voice">
@@ -97,7 +128,13 @@ export default function RouteSteps({ steps, shade }) {
 
       <ol className="steps__list">
         {annotated.map((s, i) => (
-          <li key={i} className={`steps__item${playingIndex === i ? ' steps__item--active' : ''}`}>
+          <li
+            key={i}
+            className={`steps__item${playingIndex === i ? ' steps__item--active' : ''}${
+              focusedIndex === i ? ' steps__item--focused' : ''
+            }${canFocus ? ' steps__item--clickable' : ''}`}
+            onClick={canFocus ? () => focus(i) : undefined}
+          >
             <span className="steps__num">{i + 1}</span>
             <span className="steps__text">
               {s.text || 'Continue'}
@@ -111,7 +148,10 @@ export default function RouteSteps({ steps, shade }) {
                 type="button"
                 className="steps__speak"
                 aria-label={`Read step ${i + 1} aloud`}
-                onClick={() => playOne(i)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  playOne(i)
+                }}
               >
                 🔊
               </button>

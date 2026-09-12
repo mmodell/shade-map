@@ -54,11 +54,22 @@ export default function App() {
   const [trip, setTrip] = useState(() => restored?.trip || null)
   const [navigating, setNavigating] = useState(false)
   const [userPos, setUserPos] = useState(null)
+  const [focusedStepIndex, setFocusedStepIndex] = useState(null)
   const pathsRef = useRef(new Map(restored?.paths || []))
   const stepsRef = useRef(new Map(restored?.steps || []))
 
   const ranked = useMemo(() => rankRoutes(analyzed, weights), [analyzed, weights])
   const selected = ranked.find((r) => r.id === selectedId) || ranked[0] || null
+  const selectedSteps = selected ? stepsRef.current.get(selected.id) : null
+  const focusedStep =
+    focusedStepIndex != null ? selectedSteps?.[focusedStepIndex] || null : null
+
+  // A step preview only makes sense for whatever route/search is currently
+  // on screen — drop it the moment either changes so it can't point at a
+  // step from a route you're no longer looking at.
+  useEffect(() => {
+    setFocusedStepIndex(null)
+  }, [selectedId, analyzed])
   // All routes in one search share a departure time & rough location, so
   // they're all night or all day together — every route gets shadeFraction
   // ~1 after dark, which makes the Shade slider a no-op; tell the user why.
@@ -242,7 +253,12 @@ export default function App() {
                 </button>
               )}
               {selected && (
-                <RouteSteps steps={stepsRef.current.get(selected.id)} shade={selected.shade} />
+                <RouteSteps
+                  steps={selectedSteps}
+                  shade={selected.shade}
+                  focusedIndex={focusedStepIndex}
+                  onFocusStep={setFocusedStepIndex}
+                />
               )}
             </>
           )}
@@ -257,6 +273,7 @@ export default function App() {
             onSelect={setSelectedId}
             navigating={navigating}
             onLocationChange={setUserPos}
+            focusedStep={navigating ? null : focusedStep}
           />
           {navigating && selected && (
             <Navigator
