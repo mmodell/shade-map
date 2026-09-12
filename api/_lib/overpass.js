@@ -16,9 +16,11 @@ const HIGHWAY_QUERY =
   'way["highway"~"footway|path|pedestrian|steps|cycleway|living_street|residential|service|unclassified|tertiary|secondary|primary|track"]'
 
 /* Returns { greenAreas: [[latlng]], greenLines: [[latlng]], trees: [latlng],
-   highways: [{ path:[latlng], tags }], buildings: [latlng] } for the given
-   bbox. `points` can span several route alternatives at once — pass their
-   combined points to fetch one shared dataset instead of one per route. */
+   highways: [{ path:[latlng], tags }], buildings: [{lat,lng,heightM}] } for
+   the given bbox. `points` can span several route alternatives at once —
+   pass their combined points to fetch one shared dataset instead of one per
+   route. `heightM` is real when OSM has height/building:levels tagged,
+   otherwise a flat default — see shadeCalculator.js's shadow casting. */
 export async function fetchOsmFeatures(points) {
   const b = bbox(points, 70)
   const box = `${b.south},${b.west},${b.north},${b.east}`
@@ -31,7 +33,7 @@ export async function fetchOsmFeatures(points) {
 );
 out geom tags;
 way["building"](${box});
-out center;`
+out tags center;`
 
   const json = await runQuery(q)
   return parse(json)
@@ -65,11 +67,12 @@ function parse(json) {
 
   for (const el of json.elements || []) {
     const tags = el.tags || {}
-    // Buildings come back from the separate `out center;` clause — a
-    // computed centroid instead of full geometry, since we only need a
-    // point to test route proximity against, not the building's footprint.
+    // Buildings come back from the separate `out tags center;` clause — a
+    // computed centroid instead of full geometry (we only need a point +
+    // height to cast a shadow from, not the building's actual footprint),
+    // with height/building:levels for how far that shadow reaches.
     if (el.type === 'way' && el.center && !el.geometry) {
-      buildings.push({ lat: el.center.lat, lng: el.center.lon })
+      buildings.push({ lat: el.center.lat, lng: el.center.lon, heightM: buildingHeightMeters(tags) })
       continue
     }
     if (el.type === 'node' && tags.natural === 'tree') {
@@ -89,4 +92,14 @@ function parse(json) {
   }
 
   return { greenAreas, greenLines, trees, highways, buildings }
+}
+
+const DEFAULT_BUILDING_HEIGHT_M = 12 // ~4 stories — used when OSM has no height/levels tag
+
+function buildingHeightMeters(tags) {
+  const height = parseFloat(tags.height)
+  if (Number.isFinite(height) && height > 0) return height
+  const levels = parseFloat(tags['building:levels'])
+  if (Number.isFinite(levels) && levels > 0) return levels * 3.2 // rough metres-per-storey
+  return DEFAULT_BUILDING_HEIGHT_M
 }
