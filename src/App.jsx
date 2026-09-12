@@ -5,6 +5,7 @@ import MapComponent from './components/MapComponent'
 import WeatherTimeline from './components/WeatherTimeline'
 import RouteList from './components/RouteList'
 import RouteSteps from './components/RouteSteps'
+import Navigator from './components/Navigator'
 import { requestRoutes, samplePath, routeSummary } from './lib/googleDirections'
 import { analyzeRoutes } from './lib/analyze'
 import { rankRoutes } from './lib/ranking'
@@ -51,6 +52,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(() => restored?.selectedId ?? null)
   const [formOpen, setFormOpen] = useState(() => restored?.status !== 'done')
   const [trip, setTrip] = useState(() => restored?.trip || null)
+  const [navigating, setNavigating] = useState(false)
+  const [userPos, setUserPos] = useState(null)
   const pathsRef = useRef(new Map(restored?.paths || []))
   const stepsRef = useRef(new Map(restored?.steps || []))
 
@@ -136,6 +139,7 @@ export default function App() {
         setSelectedId(null)
         setStatus('done')
         setFormOpen(false)
+        setNavigating(false)
         setTrip({
           originText,
           destText,
@@ -227,6 +231,16 @@ export default function App() {
                 selectedId={selected?.id}
                 onSelect={setSelectedId}
               />
+              {selected && !navigating && (
+                <button
+                  type="button"
+                  className="nav__start"
+                  onClick={() => setNavigating(true)}
+                  disabled={!stepsRef.current.get(selected.id)?.length}
+                >
+                  ▶ Start navigation
+                </button>
+              )}
               {selected && (
                 <RouteSteps steps={stepsRef.current.get(selected.id)} shade={selected.shade} />
               )}
@@ -241,8 +255,19 @@ export default function App() {
             paths={pathsRef.current}
             selectedId={selected?.id}
             onSelect={setSelectedId}
+            navigating={navigating}
+            onLocationChange={setUserPos}
           />
-          {hasResults && selected && (
+          {navigating && selected && (
+            <Navigator
+              key={selected.id}
+              steps={stepsRef.current.get(selected.id)}
+              mode={mode}
+              userPos={userPos}
+              onEnd={() => setNavigating(false)}
+            />
+          )}
+          {!navigating && hasResults && selected && (
             <WeatherTimeline
               weather={meta.weather}
               shade={selected.shade}

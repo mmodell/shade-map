@@ -22,12 +22,21 @@ const MAP_OPTIONS = {
 
 const FALLBACK_CENTER = { lat: 40.7128, lng: -74.006 }
 
-export default function MapComponent({ isLoaded, routes, paths, selectedId, onSelect }) {
+export default function MapComponent({
+  isLoaded,
+  routes,
+  paths,
+  selectedId,
+  onSelect,
+  navigating,
+  onLocationChange,
+}) {
   const mapRef = useRef(null)
   const wrapRef = useRef(null)
   const trafficLayerRef = useRef(null)
   const [myLocation, setMyLocation] = useState(null)
   const centeredOnMeRef = useRef(false)
+  const navZoomedRef = useRef(false)
   const [mapType, setMapType] = useState('roadmap')
   const [trafficOn, setTrafficOn] = useState(false)
   const [layersOpen, setLayersOpen] = useState(false)
@@ -36,16 +45,25 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
   const [nearbyStatus, setNearbyStatus] = useState('idle') // idle | loading | error
 
   // Ask for the user's location once, the way Google Maps itself does — a
-  // blue dot on the map, and (if there's no route yet) center there.
+  // blue dot on the map, and (if there's no route yet) center there. Higher
+  // accuracy + faster refresh while actively navigating, since Navigator
+  // uses these same fixes to advance turn-by-turn.
   useEffect(() => {
     if (!navigator.geolocation) return
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setMyLocation(loc)
+        onLocationChange?.(loc)
+      },
       () => {},
-      { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
+      navigating
+        ? { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+        : { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
     )
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigating])
 
   const endpoints = useMemo(() => {
     const first = routes[0]?.overview
@@ -76,7 +94,10 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
     }
   }
 
-  useEffect(fitToRoutes, [routes])
+  useEffect(() => {
+    if (!navigating) fitToRoutes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes, navigating])
 
   // First fix with no route on screen yet → open there instead of NYC.
   useEffect(() => {
@@ -86,6 +107,22 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
       mapRef.current.setZoom(14)
     }
   }, [myLocation, routes.length])
+
+  // Follow-camera while navigating: recenter on every fix, and zoom in once
+  // on entering nav mode (a manual zoom afterward isn't fought — only the
+  // pan repeats).
+  useEffect(() => {
+    if (!navigating) {
+      navZoomedRef.current = false
+      return
+    }
+    if (!myLocation || !mapRef.current) return
+    mapRef.current.panTo(myLocation)
+    if (!navZoomedRef.current) {
+      navZoomedRef.current = true
+      mapRef.current.setZoom(17)
+    }
+  }, [navigating, myLocation])
 
   // Traffic layer is a plain Maps JS overlay, not a React child — toggle it
   // on/off the map instance directly.
@@ -150,7 +187,7 @@ export default function MapComponent({ isLoaded, routes, paths, selectedId, onSe
 
   return (
     <div className="map" ref={wrapRef}>
-      <div className="map__chips">
+      <div className="map__chips" hidden={navigating}>
         {NEARBY_CATEGORIES.map((c) => (
           <button
             key={c.id}
