@@ -890,6 +890,12 @@
   font-weight: 700;
   text-align: center;
 }
+.nav__rerouting {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--accent);
+}
 .nav__controls {
   display: flex;
   gap: 8px;

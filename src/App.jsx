@@ -58,6 +58,10 @@ export default function App() {
   const [focusedStepIndex, setFocusedStepIndex] = useState(null)
   const pathsRef = useRef(new Map(restored?.paths || []))
   const stepsRef = useRef(new Map(restored?.steps || []))
+  // Destination/waypoints/mode from the last search, kept so a live reroute
+  // can re-run Directions from the current position to the same place
+  // without the user re-entering anything.
+  const lastSearchRef = useRef(null)
 
   const ranked = useMemo(
     () => rankRoutes(analyzed, weights, avoidRisk),
@@ -142,6 +146,7 @@ export default function App() {
         })
         pathsRef.current = paths
         stepsRef.current = steps
+        lastSearchRef.current = { destination, waypoints, mode: reqMode }
 
         // Directions has no native "arrive by" — back-calculate from the
         // primary route's duration. One pass, not iterative: for driving
@@ -184,6 +189,69 @@ export default function App() {
     },
     [departure, arriveBy]
   )
+
+  // Re-run Directions from the live position to the same destination —
+  // "leave now" semantics regardless of the original arrive-by setting,
+  // since the trip is already underway. Deliberately doesn't touch
+  // `navigating` or `formOpen`: this is a background recalculation during
+  // an active nav session, not a new search.
+  const performReroute = useCallback(async (originPos) => {
+    const last = lastSearchRef.current
+    if (!last || !originPos) throw new Error('No active route to recalculate from.')
+    const now = new Date()
+    const result = await requestRoutes({
+      origin: originPos,
+      destination: last.destination,
+      waypoints: last.waypoints,
+      mode: last.mode,
+      departure: now,
+    })
+    const routes = result.routes.slice(0, MAX_ROUTES)
+    const paths = new Map()
+    const steps = new Map()
+    const candidates = routes.map((route, i) => {
+      const id = String(i)
+      const overview = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }))
+      paths.set(id, overview)
+      const summary = routeSummary(route)
+      steps.set(id, summary.steps)
+      return {
+        id,
+        label: routeLabel(i, summary),
+        points: samplePath(route.overview_path),
+        overview,
+        distanceMeters: summary.distanceMeters,
+        durationSeconds: summary.durationSeconds,
+        durationInTrafficSeconds: summary.durationInTrafficSeconds,
+        startAddress: summary.startAddress,
+        endAddress: summary.endAddress,
+      }
+    })
+    pathsRef.current = paths
+    stepsRef.current = steps
+
+    const primaryDurationSeconds =
+      candidates[0]?.durationInTrafficSeconds || candidates[0]?.durationSeconds || 0
+    const actualArrival = new Date(now.getTime() + primaryDurationSeconds * 1000)
+    setResolvedDeparture(now)
+    setResolvedArrival(actualArrival)
+
+    const analysis = await analyzeRoutes({ candidates, departure: now })
+    setAnalyzed(analysis.routes)
+    setMeta({
+      degraded: analysis.degraded,
+      degradedReason: analysis.degradedReason,
+      weather: analysis.weather,
+      crime: analysis.crime,
+    })
+    setSelectedId(null)
+    setTrip((t) => ({
+      ...(t || {}),
+      arriveBy: false,
+      resolvedDeparture: now.toISOString(),
+      resolvedArrival: actualArrival.toISOString(),
+    }))
+  }, [])
 
   if (loadError) {
     return <Fatal title="Google Maps failed to load" detail={String(loadError)} />
@@ -306,10 +374,11 @@ export default function App() {
           />
           {navigating && selected && (
             <Navigator
-              key={selected.id}
               steps={stepsRef.current.get(selected.id)}
               mode={mode}
               userPos={userPos}
+              routePath={pathsRef.current.get(selected.id)}
+              onReroute={performReroute}
               onEnd={() => setNavigating(false)}
             />
           )}
