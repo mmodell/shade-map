@@ -374,7 +374,6 @@ export default function RouteForm({
 
       <details className="form__weights-wrap">
         <summary>
-          What matters most
           <span className="form__weights-sum">
             shade {Math.round(weights.shade * 100)} · direct {Math.round(weights.distance * 100)} ·
             safety {Math.round(weights.safety * 100)}

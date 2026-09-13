@@ -444,9 +444,6 @@
   color: var(--text-dim);
   font-size: 11px;
 }
-.form__weights-wrap[open] .form__weights-sum {
-  display: none;
-}
 .form__weights {
   border: none;
   border-top: 1px solid var(--border);
@@ -838,6 +835,12 @@
   align-items: flex-start;
   gap: 8px;
 }
+/* The `display: flex` above otherwise wins over the `hidden` attribute's
+   default `display: none` (author CSS beats the UA stylesheet), which
+   silently kept this visible while navigating despite `hidden` being set. */
+.map__topleft[hidden] {
+  display: none;
+}
 .map__chips {
   display: flex;
   flex-wrap: wrap;
@@ -1087,17 +1090,21 @@
 
 /* ---------- responsive / phone ---------- */
 @media (max-width: 780px) {
-  /* A fixed, compact header height on phones (same whether the form is open
-     or collapsed) so it can be subtracted from 100vh below — the previous
-     58vh-panel + 42vh-map split ignored the header entirely, so the header's
-     own height pushed the whole page past one screen's worth of height on
-     every phone, on top of the panel simply being too tall to begin with.
-     (A custom property would be cleaner than repeating 44px, but a bare
-     `--header-h:` declaration isn't valid directly inside `@media` — it has
-     to live inside a ruleset — and this is only used four times below.) */
+  /* Strict one-screen app: the header stays in normal flow (small, always
+     visible, opaque), and the body below it is a fixed-height stage the map
+     fills completely — the input panel floats OVER the map inside that
+     stage as a translucent card, instead of the two taking separate
+     stacked slices of the screen. This is what lets the map show through
+     behind the panel, and means panel height no longer has to be rationed
+     against the map's — it's just as tall as its content, capped so a
+     strip of map always stays visible underneath. */
+  .app {
+    height: 100vh;
+  }
   .app__header {
     padding: 6px 14px;
     min-height: 44px;
+    flex: none;
     display: flex;
     align-items: center;
   }
@@ -1117,85 +1124,118 @@
   }
 
   .app__body {
-    display: flex;
-    flex-direction: column;
-  }
-  .app__panel {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    /* Explicit heights (not flex-grow) — flex-grow needs a definite size on
-       an ancestor to resolve against, and min-height:100% chains through
-       several nested flex boxes don't reliably give it one on phones.
-       Sized as a share of the space actually left after the header, so
-       panel + map always add up to exactly one screen, never more. */
-    height: calc((100vh - 44px) * 0.52);
-    flex: none;
-    padding: 8px 12px 6px;
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
   .app__map {
-    height: calc((100vh - 44px) * 0.48);
-    flex: none;
+    position: absolute;
+    inset: 0;
   }
-  /* Form collapsed → hand most of the screen to the map. */
-  .app--compact .app__panel {
-    height: calc((100vh - 44px) * 0.24);
-  }
-  .app--compact .app__map {
-    height: calc((100vh - 44px) * 0.76);
-  }
-  /* Fully collapsed: just the one-line trip bar, map gets everything else.
-     A fixed pixel height (not a share of the remaining space) since the
-     trip bar's content is a single line regardless of screen size. */
-  .app--minimal .app__panel {
-    height: 46px;
-    padding: 0;
+  .app__panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    /* However tall the form/results content gets, always leave a real
+       strip of map visible below it rather than covering the screen —
+       generous enough that the weather timeline (bottom-anchored on the
+       map) still has clear room too. */
+    max-height: calc(100vh - 44px - 140px);
+    overflow-y: auto;
+    border-right: none;
     border-bottom: 1px solid var(--border);
+    border-radius: 0 0 18px 18px;
+    background: rgba(15, 23, 42, 0.93);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-lg);
+    padding: 6px 12px 8px;
   }
-  .app--minimal .app__map {
-    height: calc(100vh - 44px - 46px);
+  /* Live turn-by-turn has its own status banner drawn on the map — the trip
+     bar underneath it would just be a redundant, overlapping copy of the
+     same "where am I headed" info. */
+  .app--navigating .app__panel {
+    display: none;
   }
 
-  /* Tighter spacing throughout the form/results so the essentials (mode
-     row, From/To, Find routes) fit in the shorter panel without needing a
-     scroll first. */
+  /* The map's own top-left chips/legend and top-right controls need to
+     start below the floating trip bar's minimum height, or they'd render
+     right underneath it. */
+  .map__topleft,
+  .map__controls {
+    top: 52px;
+  }
+
+  /* Tighter spacing throughout the form/results — this panel floats over
+     the map now, so every extra pixel of padding directly covers more of
+     it, not just makes the page longer. */
   .form {
-    gap: 4px;
+    gap: 3px;
   }
   .form__field {
-    gap: 2px;
+    gap: 1px;
+  }
+  .form__field label {
+    font-size: 10px;
+  }
+  .modes-row {
+    gap: 6px;
   }
   .modes__btn {
-    padding: 5px 6px;
-    font-size: 12.5px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .form__collapse {
+    width: 28px;
+    height: 28px;
   }
   .form input {
-    padding: 6px 9px;
+    padding: 5px 8px;
   }
   .form__submit {
-    padding: 10px;
+    padding: 8px;
   }
   .form__weights-wrap > summary {
-    padding: 7px 10px;
+    padding: 5px 10px;
   }
   .form__weights {
-    padding: 8px 10px;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  .weight__scale,
+  .weight__hint {
+    font-size: 10px;
   }
   .tripbar {
-    padding: 8px 10px;
+    padding: 7px 10px;
+  }
+  .swap-btn {
+    width: 22px;
+    height: 22px;
+    margin: -6px 2px -2px 0;
+  }
+  .form__addstop {
+    padding: 4px 10px;
   }
   /* Recent/saved-place shortcuts are a convenience, not something the form
      needs to stay usable — cut on phones so the essentials aren't competing
-     with them for the shorter panel's height. */
+     with them for space. */
   .quick-row {
     display: none;
   }
   .routes {
-    gap: 8px;
-    margin-top: 10px;
+    gap: 6px;
+    margin-top: 8px;
   }
   .route {
-    padding: 10px;
-    gap: 6px;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .nav__start {
+    padding: 9px;
+    margin-top: 6px;
   }
 }
 

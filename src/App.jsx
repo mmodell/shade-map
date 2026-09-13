@@ -280,7 +280,7 @@ export default function App() {
     <div
       className={`app${panelMode !== 'form' ? ' app--compact' : ''}${
         panelMode === 'collapsed' ? ' app--minimal' : ''
-      }`}
+      }${navigating ? ' app--navigating' : ''}`}
     >
       <header className="app__header">
         <h1>
