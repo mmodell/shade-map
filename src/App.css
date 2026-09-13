@@ -1167,6 +1167,20 @@
   .map__controls {
     top: 52px;
   }
+  /* Once the panel is anything taller than the one-line trip bar (results
+     or the full form), it covers this exact area — the chips/legend and
+     recenter/fit buttons were still technically present underneath it,
+     just invisible AND unclickable, which is what made tapping "Coffee"
+     look broken instead of just covered. Hiding them outright whenever
+     they'd actually be covered means whatever's visible is always usable,
+     rather than leaving dead-looking-but-real controls behind the panel.
+     Navigating is excluded — the panel is already hidden outright then
+     (see `.app--navigating .app__panel` above), so there's nothing over
+     these to begin with. */
+  .app:not(.app--minimal):not(.app--navigating) .map__topleft,
+  .app:not(.app--minimal):not(.app--navigating) .map__controls {
+    display: none;
+  }
 
   /* Tighter spacing throughout the form/results — this panel floats over
      the map now, so every extra pixel of padding directly covers more of
