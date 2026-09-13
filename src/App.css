@@ -275,15 +275,10 @@
 .form__ghost:hover {
   border-color: var(--accent);
 }
-.addstop-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: -4px;
-}
 .form__addstop {
+  align-self: flex-start;
   padding: 6px 10px;
+  margin-top: -4px;
   background: none;
   border: 1px dashed var(--border);
   border-radius: 8px;
@@ -293,6 +288,58 @@
 }
 .form__addstop:hover {
   border-color: var(--accent);
+}
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: -2px;
+}
+.category-results {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: -2px;
+}
+.category-results__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.category-results__head button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 0 2px;
+}
+.category-results__item {
+  text-align: left;
+  padding: 7px 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+.category-results__item:hover {
+  background: var(--bg-input);
+}
+.category-results__empty {
+  margin: 4px 0;
+  font-size: 12.5px;
+  color: var(--text-dim);
 }
 
 .swap-btn {
@@ -1264,9 +1311,12 @@
   .form__addstop {
     padding: 4px 10px;
   }
-  .addstop-row .quick-chip {
+  .category-row .quick-chip {
     padding: 4px 10px;
     font-size: 12px;
+  }
+  .category-results {
+    padding: 6px;
   }
   /* Recent/saved-place shortcuts are a convenience, not something the form
      needs to stay usable — cut on phones so the essentials aren't competing

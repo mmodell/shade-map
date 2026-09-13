@@ -45,7 +45,7 @@ export default function App() {
   )
   const [weights, setWeights] = useState(() => restored?.weights || DEFAULT_WEIGHTS)
   const [avoidRisk, setAvoidRisk] = useState(() => restored?.avoidRisk || false)
-  const [mode, setMode] = useState(() => restored?.mode || 'WALKING')
+  const [mode, setMode] = useState(() => restored?.mode || 'DRIVING')
   const [status, setStatus] = useState(() => restored?.status || 'idle') // idle | loading | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [analyzed, setAnalyzed] = useState(() => restored?.analyzed || [])

@@ -6,7 +6,10 @@ const MAP_OPTIONS = {
   disableDefaultUI: true,
   zoomControl: true,
   scaleControl: true,
-  clickableIcons: false,
+  // Was false — that's what made every POI label/icon on the base map
+  // (restaurants, shops, landmarks) inert to taps. On, it shows Google's own
+  // small info card (name, rating, a directions link) for whatever you tap.
+  clickableIcons: true,
   gestureHandling: 'greedy',
   styles: [
     { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },

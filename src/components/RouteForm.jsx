@@ -47,12 +47,14 @@ export default function RouteForm({
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(() => getSavedPlaces())
   const [recents, setRecents] = useState(() => getRecentPlaces())
-  const [addingCategory, setAddingCategory] = useState(null) // category.id while a quick-add search is in flight
   const nextStopId = useRef(0)
 
   const busy = status === 'loading'
   const originText = geoOrigin ? 'Current location' : origin?.text
   const modeInfo = TRAVEL_MODES.find((m) => m.id === mode) || TRAVEL_MODES[0]
+  // Where a stop's category search is centered — the trip's destination if
+  // it's picked, otherwise wherever the trip starts.
+  const stopSearchCenter = destination?.location || geoOrigin || origin?.location
 
   function addStop() {
     if (stops.length >= MAX_STOPS) return
@@ -63,31 +65,6 @@ export default function RouteForm({
   }
   function setStopValue(id, value) {
     setStops((s) => s.map((stop) => (stop.id === id ? { ...stop, value } : stop)))
-  }
-
-  // Quick-add a stop by category (Coffee/Food/Parks/Sights) instead of
-  // typing an address — searches near the destination (where you're
-  // actually headed) and adds the closest match directly as a stop.
-  async function addCategoryStop(category) {
-    const center = destination?.location || geoOrigin || origin?.location
-    if (!center) {
-      setError('Pick a destination first, then add a stop near it.')
-      return
-    }
-    setError('')
-    setAddingCategory(category.id)
-    try {
-      const results = await searchNearby({ category, center })
-      if (!results.length) {
-        setError(`No ${category.label.toLowerCase()} found near your destination.`)
-        return
-      }
-      setStops((s) => [...s, { id: nextStopId.current++, value: { text: results[0].name, location: results[0].location } }])
-    } catch {
-      setError('Could not search nearby places.')
-    } finally {
-      setAddingCategory(null)
-    }
   }
 
   function saveAs(kind, place) {
@@ -293,6 +270,7 @@ export default function RouteForm({
             id={`stop-${stop.id}`}
             index={i}
             stop={stop}
+            searchCenter={stopSearchCenter}
             onSelect={(v) => setStopValue(stop.id, v)}
             onRemove={() => removeStop(stop.id)}
             onError={setError}
@@ -303,32 +281,13 @@ export default function RouteForm({
           not something offered while still building the first search —
           gated on an actual found route (not just a picked destination),
           so it only ever shows once you've reopened an existing result to
-          change it. The category buttons replace what used to be always-on
-          "nearby places" chips floating over the map — same underlying
-          search, but only shown when they're actually actionable (about to
-          add a stop) instead of taking up map space all the time. */}
+          change it. Category search (Coffee/Food/Parks/Sights) lives on
+          each stop field itself once it exists, not here — this is just
+          the "give me a slot to fill" action. */}
       {isLoaded && status === 'done' && stops.length < MAX_STOPS && (
-        <div className="addstop-row">
-          {NEARBY_CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className="quick-chip"
-              disabled={addingCategory != null}
-              onClick={() => addCategoryStop(c)}
-            >
-              {addingCategory === c.id ? '…' : c.glyph} {c.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="form__addstop"
-            disabled={addingCategory != null}
-            onClick={addStop}
-          >
-            + Add stop
-          </button>
-        </div>
+        <button type="button" className="form__addstop" onClick={addStop}>
+          + Add stop
+        </button>
       )}
 
       {(saved.home || saved.work || recents.length > 0) && (
@@ -479,14 +438,50 @@ export default function RouteForm({
   )
 }
 
-function PlaceStopField({ id, index, stop, onSelect, onRemove, onError }) {
+function PlaceStopField({ id, index, stop, searchCenter, onSelect, onRemove, onError }) {
+  const [results, setResults] = useState(null) // array of matches | null (closed)
+  const [activeCategory, setActiveCategory] = useState(null)
+  const [searching, setSearching] = useState(false)
+
+  // A real search, not a guess: shows every nearby match for the category
+  // and lets you pick one, instead of silently grabbing whichever result
+  // happened to come back first (there's often several of the same kind of
+  // place nearby, and the closest one isn't necessarily the one you want).
+  async function searchCategory(category) {
+    if (!searchCenter) {
+      onError('Pick a destination first, then search near it.')
+      return
+    }
+    onError('')
+    setActiveCategory(category)
+    setSearching(true)
+    setResults(null)
+    try {
+      const found = await searchNearby({ category, center: searchCenter, radiusMeters: 2500 })
+      setResults(found)
+    } catch {
+      onError('Could not search nearby places.')
+      setResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function pick(place) {
+    onSelect({ text: place.name, location: place.location })
+    setResults(null)
+  }
+
   return (
     <>
       <PlaceField
         id={id}
         label={`Stop ${index + 1}`}
         placeholder="Address or place"
-        onSelect={onSelect}
+        onSelect={(v) => {
+          onSelect(v)
+          setResults(null)
+        }}
         trailing={
           <>
             <MicButton onSelect={onSelect} onError={onError} />
@@ -501,15 +496,52 @@ function PlaceStopField({ id, index, stop, onSelect, onRemove, onError }) {
           </>
         }
       />
-      {/* Same "the box can't show a value" limitation as SaveAsRow below —
-          matters even more for a stop filled by the category quick-add
-          buttons, since then the user never typed or picked anything
-          themselves. Without this, clicking "Coffee" looks like nothing
-          happened. */}
+      {/* PlaceField can't show a value inside the box itself (same
+          limitation as SaveAsRow below) — confirm what's actually set,
+          whether typed, spoken, or picked from a category search below. */}
       {stop.value?.text && (
         <span className="save-row__current" title={stop.value.text}>
           ✓ {stop.value.text}
         </span>
+      )}
+      <div className="category-row">
+        {NEARBY_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="quick-chip"
+            disabled={searching}
+            onClick={() => searchCategory(c)}
+          >
+            {searching && activeCategory?.id === c.id ? '…' : c.glyph} {c.label}
+          </button>
+        ))}
+      </div>
+      {results && (
+        <div className="category-results">
+          <div className="category-results__head">
+            <span>
+              {results.length} {activeCategory?.label.toLowerCase()} nearby
+            </span>
+            <button type="button" onClick={() => setResults(null)}>
+              ✕
+            </button>
+          </div>
+          {results.length === 0 ? (
+            <p className="category-results__empty">Nothing found nearby — try a different category.</p>
+          ) : (
+            results.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className="category-results__item"
+                onClick={() => pick(r)}
+              >
+                {r.name}
+              </button>
+            ))
+          )}
+        </div>
       )}
     </>
   )

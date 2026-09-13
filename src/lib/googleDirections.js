@@ -3,9 +3,9 @@
    steps. */
 
 export const TRAVEL_MODES = [
+  { id: 'DRIVING', label: 'Drive', glyph: '🚗' },
   { id: 'WALKING', label: 'Walk', glyph: '🚶' },
   { id: 'BICYCLING', label: 'Bike', glyph: '🚴' },
-  { id: 'DRIVING', label: 'Drive', glyph: '🚗' },
 ]
 
 export function requestRoutes({ origin, destination, waypoints = [], mode = 'WALKING', departure }) {
