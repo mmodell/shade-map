@@ -28,8 +28,11 @@ export default function RouteForm({
   onModeChange,
   status,
   collapsed,
+  resultsMode,
   onExpand,
   onCollapse,
+  onToggleResults,
+  score,
   onSubmit,
   trip,
   nightMode,
@@ -123,8 +126,23 @@ export default function RouteForm({
     // fields — this is what lets the trip bar survive a page refresh even
     // though the Places widgets themselves can't be pre-filled.
     const stopCount = trip?.stopCount ?? stops.length
+    const isMinimal = resultsMode === 'collapsed'
+    // A div, not a button: it needs to contain its own real <button> ("Edit")
+    // for the separate "open the full form" action, and a button can't
+    // nest another interactive element.
     return (
-      <button type="button" className="tripbar" onClick={onExpand}>
+      <div
+        className="tripbar"
+        role="button"
+        tabIndex={0}
+        onClick={onToggleResults}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggleResults?.()
+          }
+        }}
+      >
         <span className="tripbar__mode">{modeInfo.glyph}</span>
         <span className="tripbar__route">
           <span className="tripbar__pt">{trip?.originText || originText || 'Start'}</span>
@@ -134,13 +152,26 @@ export default function RouteForm({
           )}
           <span className="tripbar__pt">{trip?.destText || destination?.text || 'Destination'}</span>
         </span>
+        {isMinimal && score != null && <span className="tripbar__score">{score}</span>}
         <span className="tripbar__time">
           {trip?.arriveBy && trip?.resolvedArrival
             ? `Arrive ${formatClock(new Date(trip.resolvedArrival))}`
             : formatClock(departure)}
         </span>
-        <span className="tripbar__edit">Edit</span>
-      </button>
+        <button
+          type="button"
+          className="tripbar__edit"
+          onClick={(e) => {
+            e.stopPropagation()
+            onExpand()
+          }}
+        >
+          Edit
+        </button>
+        <span className="tripbar__chevron" aria-hidden="true">
+          {isMinimal ? '▾' : '▴'}
+        </span>
+      </div>
     )
   }
 

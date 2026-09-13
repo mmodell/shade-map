@@ -152,6 +152,7 @@
   box-shadow: var(--shadow-sm);
   color: inherit;
   text-align: left;
+  cursor: pointer;
 }
 .tripbar:hover {
   border-color: var(--accent-dim);
@@ -187,11 +188,26 @@
   font-size: 12px;
   flex: none;
 }
+.tripbar__score {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
 .tripbar__edit {
   flex: none;
+  background: none;
+  border: none;
+  padding: 0;
   color: var(--accent);
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
+}
+.tripbar__chevron {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 10px;
 }
 
 /* ---------- form ---------- */
@@ -1126,6 +1142,17 @@
   }
   .app--compact .app__map {
     height: calc((100vh - 44px) * 0.76);
+  }
+  /* Fully collapsed: just the one-line trip bar, map gets everything else.
+     A fixed pixel height (not a share of the remaining space) since the
+     trip bar's content is a single line regardless of screen size. */
+  .app--minimal .app__panel {
+    height: 46px;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app--minimal .app__map {
+    height: calc(100vh - 44px - 46px);
   }
 
   /* Tighter spacing throughout the form/results so the essentials (mode

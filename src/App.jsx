@@ -51,7 +51,12 @@ export default function App() {
   const [analyzed, setAnalyzed] = useState(() => restored?.analyzed || [])
   const [meta, setMeta] = useState(() => restored?.meta || { degraded: false, weather: null })
   const [selectedId, setSelectedId] = useState(() => restored?.selectedId ?? null)
-  const [formOpen, setFormOpen] = useState(() => restored?.status !== 'done')
+  // 'form' = full editing form; 'results' = trip bar + route list/start nav/
+  // steps (today's old "compact" view); 'collapsed' = trip bar only, one
+  // line, maximizing map space. A finished search lands on 'collapsed' by
+  // default — 'results' is one tap away (tap the trip bar), 'form' is
+  // reached via its explicit "Edit" button from either.
+  const [panelMode, setPanelMode] = useState(() => (restored?.status !== 'done' ? 'form' : 'collapsed'))
   const [trip, setTrip] = useState(() => restored?.trip || null)
   const [navigating, setNavigating] = useState(false)
   const [userPos, setUserPos] = useState(null)
@@ -172,7 +177,7 @@ export default function App() {
         })
         setSelectedId(null)
         setStatus('done')
-        setFormOpen(false)
+        setPanelMode('collapsed')
         setNavigating(false)
         setTrip({
           originText,
@@ -193,7 +198,7 @@ export default function App() {
   // Re-run Directions from the live position to the same destination —
   // "leave now" semantics regardless of the original arrive-by setting,
   // since the trip is already underway. Deliberately doesn't touch
-  // `navigating` or `formOpen`: this is a background recalculation during
+  // `navigating` or `panelMode`: this is a background recalculation during
   // an active nav session, not a new search.
   const performReroute = useCallback(async (originPos) => {
     const last = lastSearchRef.current
@@ -268,7 +273,11 @@ export default function App() {
   const hasResults = status === 'done' && ranked.length > 0
 
   return (
-    <div className={`app${!formOpen ? ' app--compact' : ''}`}>
+    <div
+      className={`app${panelMode !== 'form' ? ' app--compact' : ''}${
+        panelMode === 'collapsed' ? ' app--minimal' : ''
+      }`}
+    >
       <header className="app__header">
         <h1>
           <span className="app__mark" aria-hidden="true">☀︎</span>
@@ -292,9 +301,14 @@ export default function App() {
             mode={mode}
             onModeChange={setMode}
             status={status}
-            collapsed={!formOpen}
-            onExpand={() => setFormOpen(true)}
-            onCollapse={() => setFormOpen(false)}
+            collapsed={panelMode !== 'form'}
+            resultsMode={panelMode === 'collapsed' ? 'collapsed' : 'results'}
+            score={selected ? Math.round(selected.composite * 100) : null}
+            onExpand={() => setPanelMode('form')}
+            onCollapse={() => setPanelMode('collapsed')}
+            onToggleResults={() =>
+              setPanelMode((m) => (m === 'collapsed' ? 'results' : 'collapsed'))
+            }
             onSubmit={runSearch}
             trip={trip}
             nightMode={nightMode}
@@ -302,61 +316,65 @@ export default function App() {
 
           {status === 'error' && <p className="app__error">{errorMsg}</p>}
 
-          {meta.degraded && status === 'done' && (
-            <p className="app__notice">
-              Shade estimated from sun angle only — the analyzer wasn’t reachable
-              {meta.degradedReason ? ` (${meta.degradedReason})` : ''}.
-            </p>
-          )}
-
-          {meta.crime && status === 'done' && (
-            <p className="app__notice app__notice--crime">
-              📊 {meta.crime.state} violent crime is {meta.crime.label} (FBI, {meta.crime.year}) —
-              a statewide figure, not specific to this route.
-            </p>
-          )}
-
-          {avoidRisk && status === 'done' && (
-            <p className="app__notice app__notice--risk">
-              🚫 Avoiding risky stretches — routes are sorted by the least exposure to busy,
-              unlit, sidewalk-free roads first, ahead of your shade/distance/safety sliders.
-            </p>
-          )}
-
-          {arriveBy && status === 'done' && resolvedArrival && (
-            <p className="app__notice">
-              🕑 Leave by <strong>{formatClock(resolvedDeparture)}</strong> to arrive by{' '}
-              <strong>{formatClock(resolvedArrival)}</strong> (based on the top route — other
-              options may take a little longer or shorter).
-            </p>
-          )}
-
-          {hasResults && (
+          {panelMode === 'results' && (
             <>
-              <RouteList
-                routes={ranked}
-                selectedId={selected?.id}
-                onSelect={setSelectedId}
-              />
-              {selected && !navigating && (
-                <button
-                  type="button"
-                  className="nav__start"
-                  onClick={() => setNavigating(true)}
-                  disabled={!stepsRef.current.get(selected.id)?.length}
-                >
-                  ▶ Start navigation
-                </button>
+              {meta.degraded && status === 'done' && (
+                <p className="app__notice">
+                  Shade estimated from sun angle only — the analyzer wasn’t reachable
+                  {meta.degradedReason ? ` (${meta.degradedReason})` : ''}.
+                </p>
               )}
-              {selected && (
-                <RouteSteps
-                  steps={selectedSteps}
-                  shade={selected.shade}
-                  safety={selected.safety}
-                  points={selected.points}
-                  focusedIndex={focusedStepIndex}
-                  onFocusStep={setFocusedStepIndex}
-                />
+
+              {meta.crime && status === 'done' && (
+                <p className="app__notice app__notice--crime">
+                  📊 {meta.crime.state} violent crime is {meta.crime.label} (FBI, {meta.crime.year}) —
+                  a statewide figure, not specific to this route.
+                </p>
+              )}
+
+              {avoidRisk && status === 'done' && (
+                <p className="app__notice app__notice--risk">
+                  🚫 Avoiding risky stretches — routes are sorted by the least exposure to busy,
+                  unlit, sidewalk-free roads first, ahead of your shade/distance/safety sliders.
+                </p>
+              )}
+
+              {arriveBy && status === 'done' && resolvedArrival && (
+                <p className="app__notice">
+                  🕑 Leave by <strong>{formatClock(resolvedDeparture)}</strong> to arrive by{' '}
+                  <strong>{formatClock(resolvedArrival)}</strong> (based on the top route — other
+                  options may take a little longer or shorter).
+                </p>
+              )}
+
+              {hasResults && (
+                <>
+                  <RouteList
+                    routes={ranked}
+                    selectedId={selected?.id}
+                    onSelect={setSelectedId}
+                  />
+                  {selected && !navigating && (
+                    <button
+                      type="button"
+                      className="nav__start"
+                      onClick={() => setNavigating(true)}
+                      disabled={!stepsRef.current.get(selected.id)?.length}
+                    >
+                      ▶ Start navigation
+                    </button>
+                  )}
+                  {selected && (
+                    <RouteSteps
+                      steps={selectedSteps}
+                      shade={selected.shade}
+                      safety={selected.safety}
+                      points={selected.points}
+                      focusedIndex={focusedStepIndex}
+                      onFocusStep={setFocusedStepIndex}
+                    />
+                  )}
+                </>
               )}
             </>
           )}
