@@ -51,6 +51,20 @@ export default function PlaceField({ label, id, placeholder, onSelect, trailing 
             '',
           location: loc ? { lat: loc.lat(), lng: loc.lng() } : null,
         })
+        // Left to itself, the widget fills its own box with the full
+        // selected address and — being a closed shadow-DOM input we can't
+        // reach to reset scroll/caret position on — shows whichever end
+        // the browser's caret-follow scrolling happens to land on, which
+        // for a long address is the city/state tail, not the street. We
+        // already show the real selection in our own confirmation line
+        // below (always left-to-right, never truncated from the wrong
+        // end), so just clear the widget's own copy back to placeholder
+        // rather than leave a second, differently-truncated copy visible.
+        try {
+          el.value = ''
+        } catch {
+          /* no settable value on this version — leave it be */
+        }
       })
     }
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GoogleMap } from '@react-google-maps/api'
 import { rankColor } from '../lib/ranking'
-import { NEARBY_CATEGORIES, searchNearby } from '../lib/nearbyPlaces'
 
 const MAP_OPTIONS = {
   disableDefaultUI: true,
@@ -67,7 +66,6 @@ export default function MapComponent({
   const trafficLayerRef = useRef(null)
   const routeOverlaysRef = useRef([])
   const blueDotRef = useRef(null)
-  const nearbyMarkersRef = useRef([])
   const focusOverlaysRef = useRef([])
   const [mapReady, setMapReady] = useState(false)
   const [myLocation, setMyLocation] = useState(null)
@@ -76,9 +74,6 @@ export default function MapComponent({
   const [mapType, setMapType] = useState('roadmap')
   const [trafficOn, setTrafficOn] = useState(false)
   const [layersOpen, setLayersOpen] = useState(false)
-  const [nearbyCategory, setNearbyCategory] = useState(null)
-  const [nearbyPlaces, setNearbyPlaces] = useState([])
-  const [nearbyStatus, setNearbyStatus] = useState('idle') // idle | loading | error
   const [headingUp, setHeadingUp] = useState(false)
   const [gpsHeading, setGpsHeading] = useState(null)
   const [compassHeading, setCompassHeading] = useState(null)
@@ -401,55 +396,6 @@ export default function MapComponent({
     }
   }, [myLocation, mapReady])
 
-  async function toggleCategory(category) {
-    if (nearbyCategory?.id === category.id) {
-      setNearbyCategory(null)
-      setNearbyPlaces([])
-      setNearbyStatus('idle')
-      return
-    }
-    setNearbyCategory(category)
-    setNearbyStatus('loading')
-    try {
-      const center = mapRef.current?.getCenter()
-      const loc = center ? { lat: center.lat(), lng: center.lng() } : myLocation || FALLBACK_CENTER
-      const places = await searchNearby({ category, center: loc })
-      setNearbyPlaces(places)
-      setNearbyStatus('idle')
-    } catch {
-      setNearbyPlaces([])
-      setNearbyStatus('error')
-    }
-  }
-
-  // Nearby-category pins — native overlays, rebuilt when the results change.
-  useEffect(() => {
-    if (!mapReady || !window.google || !mapRef.current) return
-    nearbyMarkersRef.current.forEach((m) => m.setMap(null))
-    if (!nearbyCategory) {
-      nearbyMarkersRef.current = []
-      return
-    }
-    const markers = nearbyPlaces.map(
-      (p) =>
-        new window.google.maps.Marker({
-          map: mapRef.current,
-          position: p.location,
-          title: p.name,
-          zIndex: 4,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 6,
-            fillColor: nearbyCategory.color,
-            fillOpacity: 0.95,
-            strokeColor: '#0b1220',
-            strokeWeight: 1.5,
-          },
-        })
-    )
-    nearbyMarkersRef.current = markers
-  }, [nearbyCategory, nearbyPlaces, mapReady])
-
   // The panel collapses/expands around the map — keep Google Maps in sync with
   // its container size so it doesn't render grey bands. Debounced and just
   // triggers 'resize' (no forced re-fit) so it can't fight a user's own pan/zoom.
@@ -485,21 +431,6 @@ export default function MapComponent({
   return (
     <div className="map" ref={wrapRef}>
       <div className="map__topleft" hidden={navigating}>
-        <div className="map__chips">
-          {NEARBY_CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={`map__chip${nearbyCategory?.id === c.id ? ' map__chip--on' : ''}`}
-              onClick={() => toggleCategory(c)}
-            >
-              {c.glyph} {c.label}
-            </button>
-          ))}
-          {nearbyStatus === 'loading' && <span className="map__chipstatus">Searching…</span>}
-          {nearbyStatus === 'error' && <span className="map__chipstatus">Couldn’t load nearby places</span>}
-        </div>
-
         {(shadeSegments || safetySegments) && (
           <div className="map__legend">
             {/* Swatches mirror the actual route rendering: a solid dot for

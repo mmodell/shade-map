@@ -5,6 +5,7 @@ import { TRAVEL_MODES } from '../lib/googleDirections'
 import { formatClock } from '../lib/format'
 import { getSavedPlaces, savePlace } from '../lib/savedPlaces'
 import { getRecentPlaces, pushRecentPlace } from '../lib/recentPlaces'
+import { NEARBY_CATEGORIES, searchNearby } from '../lib/nearbyPlaces'
 
 const WEIGHT_FIELDS = [
   { key: 'shade', label: 'Shade', minLabel: 'More sun exposure', maxLabel: 'No sun exposure' },
@@ -46,6 +47,7 @@ export default function RouteForm({
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(() => getSavedPlaces())
   const [recents, setRecents] = useState(() => getRecentPlaces())
+  const [addingCategory, setAddingCategory] = useState(null) // category.id while a quick-add search is in flight
   const nextStopId = useRef(0)
 
   const busy = status === 'loading'
@@ -61,6 +63,31 @@ export default function RouteForm({
   }
   function setStopValue(id, value) {
     setStops((s) => s.map((stop) => (stop.id === id ? { ...stop, value } : stop)))
+  }
+
+  // Quick-add a stop by category (Coffee/Food/Parks/Sights) instead of
+  // typing an address — searches near the destination (where you're
+  // actually headed) and adds the closest match directly as a stop.
+  async function addCategoryStop(category) {
+    const center = destination?.location || geoOrigin || origin?.location
+    if (!center) {
+      setError('Pick a destination first, then add a stop near it.')
+      return
+    }
+    setError('')
+    setAddingCategory(category.id)
+    try {
+      const results = await searchNearby({ category, center })
+      if (!results.length) {
+        setError(`No ${category.label.toLowerCase()} found near your destination.`)
+        return
+      }
+      setStops((s) => [...s, { id: nextStopId.current++, value: { text: results[0].name, location: results[0].location } }])
+    } catch {
+      setError('Could not search nearby places.')
+    } finally {
+      setAddingCategory(null)
+    }
   }
 
   function saveAs(kind, place) {
@@ -261,25 +288,14 @@ export default function RouteForm({
 
       {isLoaded &&
         stops.map((stop, i) => (
-          <PlaceField
+          <PlaceStopField
             key={stop.id}
             id={`stop-${stop.id}`}
-            label={`Stop ${i + 1}`}
-            placeholder="Address or place"
+            index={i}
+            stop={stop}
             onSelect={(v) => setStopValue(stop.id, v)}
-            trailing={
-              <>
-                <MicButton onSelect={(v) => setStopValue(stop.id, v)} onError={setError} />
-                <button
-                  type="button"
-                  className="form__ghost"
-                  aria-label={`Remove stop ${i + 1}`}
-                  onClick={() => removeStop(stop.id)}
-                >
-                  ✕
-                </button>
-              </>
-            }
+            onRemove={() => removeStop(stop.id)}
+            onError={setError}
           />
         ))}
 
@@ -287,11 +303,32 @@ export default function RouteForm({
           not something offered while still building the first search —
           gated on an actual found route (not just a picked destination),
           so it only ever shows once you've reopened an existing result to
-          change it. */}
+          change it. The category buttons replace what used to be always-on
+          "nearby places" chips floating over the map — same underlying
+          search, but only shown when they're actually actionable (about to
+          add a stop) instead of taking up map space all the time. */}
       {isLoaded && status === 'done' && stops.length < MAX_STOPS && (
-        <button type="button" className="form__addstop" onClick={addStop}>
-          + Add stop
-        </button>
+        <div className="addstop-row">
+          {NEARBY_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="quick-chip"
+              disabled={addingCategory != null}
+              onClick={() => addCategoryStop(c)}
+            >
+              {addingCategory === c.id ? '…' : c.glyph} {c.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="form__addstop"
+            disabled={addingCategory != null}
+            onClick={addStop}
+          >
+            + Add stop
+          </button>
+        </div>
       )}
 
       {(saved.home || saved.work || recents.length > 0) && (
@@ -439,6 +476,42 @@ export default function RouteForm({
         {busy ? 'Finding routes…' : 'Find routes'}
       </button>
     </form>
+  )
+}
+
+function PlaceStopField({ id, index, stop, onSelect, onRemove, onError }) {
+  return (
+    <>
+      <PlaceField
+        id={id}
+        label={`Stop ${index + 1}`}
+        placeholder="Address or place"
+        onSelect={onSelect}
+        trailing={
+          <>
+            <MicButton onSelect={onSelect} onError={onError} />
+            <button
+              type="button"
+              className="form__ghost"
+              aria-label={`Remove stop ${index + 1}`}
+              onClick={onRemove}
+            >
+              ✕
+            </button>
+          </>
+        }
+      />
+      {/* Same "the box can't show a value" limitation as SaveAsRow below —
+          matters even more for a stop filled by the category quick-add
+          buttons, since then the user never typed or picked anything
+          themselves. Without this, clicking "Coffee" looks like nothing
+          happened. */}
+      {stop.value?.text && (
+        <span className="save-row__current" title={stop.value.text}>
+          ✓ {stop.value.text}
+        </span>
+      )}
+    </>
   )
 }
 

@@ -275,15 +275,21 @@
 .form__ghost:hover {
   border-color: var(--accent);
 }
-.form__addstop {
-  align-self: flex-start;
-  padding: 6px 10px;
+.addstop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: -4px;
+}
+.form__addstop {
+  padding: 6px 10px;
   background: none;
   border: 1px dashed var(--border);
   border-radius: 8px;
   color: var(--accent);
   font-size: 12.5px;
+  white-space: nowrap;
 }
 .form__addstop:hover {
   border-color: var(--accent);
@@ -860,36 +866,6 @@
 .map__topleft[hidden] {
   display: none;
 }
-.map__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-.map__chip {
-  padding: 7px 12px;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  font-size: 12.5px;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-.map__chip--on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--bg-elevated);
-}
-.map__chipstatus {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  background: rgba(15, 23, 42, 0.85);
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-
 .map__layers {
   position: absolute;
   left: 12px;
@@ -1250,6 +1226,7 @@
     padding: 4px 8px !important;
     min-height: 0 !important;
     background: transparent !important;
+    text-align: left !important;
   }
   /* The "Current location" state (after tapping ◎) swaps the web component
      out for a plain styled chip instead — a completely different element
@@ -1286,6 +1263,10 @@
   }
   .form__addstop {
     padding: 4px 10px;
+  }
+  .addstop-row .quick-chip {
+    padding: 4px 10px;
+    font-size: 12px;
   }
   /* Recent/saved-place shortcuts are a convenience, not something the form
      needs to stay usable — cut on phones so the essentials aren't competing
