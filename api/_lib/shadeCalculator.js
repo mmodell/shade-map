@@ -13,6 +13,10 @@ const SHADOW_ANGLE_TOLERANCE_DEG = 35
 // height/tan(altitude) blows up (a 12m building "reaches" 700m at 1°), which
 // stops being a useful routing signal long before the geometry says so.
 const MAX_SHADOW_REACH_M = 60
+// Cloud cover (0-100%) above which direct sun isn't really reaching the
+// ground at all — past this point, which side of the street is "sun" vs
+// "shade" stops being a meaningful comfort difference (see `isOvercast`).
+const OVERCAST_CLOUDS_PCT = 75
 
 /* Heuristic shade estimate for one route.
    - canopy shade: does the point fall inside/near a park, wood, tree row or
@@ -26,7 +30,8 @@ const MAX_SHADOW_REACH_M = 60
      which side of the street it's tagged against; this is what makes that
      distinction instead of averaging it away.
 */
-export function computeShade({ points, osm, date }) {
+export function computeShade({ points, osm, date, cloudsPct = null }) {
+  const isOvercast = cloudsPct != null && cloudsPct >= OVERCAST_CLOUDS_PCT
   const anchor = points[0]
   const project = projector(anchor)
 
@@ -80,6 +85,8 @@ export function computeShade({ points, osm, date }) {
     return {
       shadeFraction: 1,
       isNight: true,
+      isOvercast: false, // moot after dark — the note already covers it
+      cloudsPct,
       sunAltitude: round1(altitudeDeg),
       sunAzimuth: round1(azimuthDeg),
       uvIndex: 0,
@@ -99,13 +106,24 @@ export function computeShade({ points, osm, date }) {
   return {
     shadeFraction: round2(shadeFraction),
     isNight: false,
+    // Heavy overcast means there's no harsh direct sun to dodge in the first
+    // place, so which side of the street counts as "sun" stops being a real
+    // comfort difference — surfaced so the UI can tell the user their Shade
+    // preference isn't doing anything useful right now (the same treatment
+    // `isNight` already gets), rather than silently reordering routes on a
+    // geometric distinction the weather has made irrelevant.
+    isOvercast,
+    cloudsPct,
     sunAltitude: round1(altitudeDeg),
     sunAzimuth: round1(azimuthDeg),
-    uvIndex: estimateUvIndex(altitudeDeg),
+    uvIndex: estimateUvIndex(altitudeDeg, cloudsPct ?? 0),
     greenCoverage: round2(greenCoverage),
     builtUpFactor: round2(builtUpFactor),
     canopyShare: round2(greenCoverage),
     pointShade,
+    note: isOvercast
+      ? `Overcast (${Math.round(cloudsPct)}% cloud cover) — little direct sun to route around either way.`
+      : undefined,
   }
 }
 

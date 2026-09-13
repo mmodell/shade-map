@@ -36,6 +36,7 @@ export default function RouteForm({
   onSubmit,
   trip,
   nightMode,
+  overcastMode,
 }) {
   const [origin, setOrigin] = useState(null) // { text, location }
   const [destination, setDestination] = useState(null)
@@ -381,9 +382,9 @@ export default function RouteForm({
         </summary>
         <fieldset className="form__weights">
           {WEIGHT_FIELDS.map(({ key, label, minLabel, maxLabel }) => {
-            const isShadeAtNight = key === 'shade' && nightMode
+            const isShadeMuted = key === 'shade' && (nightMode || overcastMode)
             return (
-              <div className={`weight${isShadeAtNight ? ' weight--dim' : ''}`} key={key}>
+              <div className={`weight${isShadeMuted ? ' weight--dim' : ''}`} key={key}>
                 <div className="weight__row">
                   <span className="weight__label">{label}</span>
                   <span className="weight__val">{Math.round(weights[key] * 100)}</span>
@@ -393,14 +394,18 @@ export default function RouteForm({
                   min="0"
                   max="100"
                   value={Math.round(weights[key] * 100)}
-                  disabled={isShadeAtNight}
+                  disabled={isShadeMuted}
                   onChange={(e) =>
                     onWeightsChange({ ...weights, [key]: Number(e.target.value) / 100 })
                   }
                   aria-label={`${label} priority, from ${minLabel} to ${maxLabel}`}
                 />
-                {isShadeAtNight ? (
-                  <span className="weight__hint">🌙 Not relevant after dark — try Safety instead</span>
+                {isShadeMuted ? (
+                  <span className="weight__hint">
+                    {nightMode
+                      ? '🌙 Not relevant after dark — try Safety instead'
+                      : '☁️ Overcast — no direct sun to route around — try Safety instead'}
+                  </span>
                 ) : (
                   <div className="weight__scale">
                     <span>{minLabel}</span>

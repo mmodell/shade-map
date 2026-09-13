@@ -54,6 +54,7 @@ export default async function handler(req, res) {
       : Promise.resolve({ osm: EMPTY_OSM, ok: false }),
   ])
   const { osm, ok: osmOk } = osmResult
+  const cloudsPct = nearestCloudsPct(weather, date)
 
   const analyzed = routes.map(({ id, points }) => {
     if (points.length < 2) {
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     const mid = points[Math.floor(points.length / 2)]
 
     const matched = matchHighways(points, osm.highways)
-    const shade = computeShade({ points, osm, date })
+    const shade = computeShade({ points, osm, date, cloudsPct })
     if (!osmOk) {
       shade.note = 'Map data was unavailable — shade estimated from sun angle only.'
       shade.greenCoverage = null
@@ -89,6 +90,25 @@ function sanitizePoints(points) {
         Math.abs(p.lng) <= 180
     )
     .slice(0, 400)
+}
+
+// The weather timeline has one point per forecast step (plus "now") — find
+// whichever is closest to the requested departure time and use its cloud
+// cover for the shade calculation, rather than always assuming clear sky.
+function nearestCloudsPct(weather, date) {
+  if (!weather?.points?.length) return null
+  const target = date.getTime()
+  let best = null
+  let bestDiffMs = Infinity
+  for (const p of weather.points) {
+    if (p.clouds == null) continue
+    const diffMs = Math.abs(new Date(p.time).getTime() - target)
+    if (diffMs < bestDiffMs) {
+      best = p
+      bestDiffMs = diffMs
+    }
+  }
+  return best ? best.clouds : null
 }
 
 function parseDate(iso) {

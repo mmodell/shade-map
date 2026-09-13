@@ -87,6 +87,10 @@ export default function App() {
   // they're all night or all day together — every route gets shadeFraction
   // ~1 after dark, which makes the Shade slider a no-op; tell the user why.
   const nightMode = analyzed.some((r) => r.shade?.isNight)
+  // Same idea for heavy overcast: there's no harsh direct sun anywhere to
+  // route around, so which side of the street is nominally "sun" vs "shade"
+  // isn't a real comfort difference right now.
+  const overcastMode = analyzed.some((r) => r.shade?.isOvercast)
 
   // Persist just enough to rebuild the screen after a refresh — no re-query needed.
   useEffect(() => {
@@ -312,6 +316,7 @@ export default function App() {
             onSubmit={runSearch}
             trip={trip}
             nightMode={nightMode}
+            overcastMode={overcastMode}
           />
 
           {status === 'error' && <p className="app__error">{errorMsg}</p>}

@@ -78,6 +78,38 @@ describe('computeShade — directional building shadow', () => {
   })
 })
 
+describe('computeShade — cloud cover', () => {
+  const points = linePoints(40.75, -73.99, 5)
+  const day = new Date('2026-09-23T17:30:00Z')
+
+  it('defaults to not overcast when no cloud data is available', () => {
+    const result = computeShade({ points, osm: EMPTY_OSM, date: day })
+    expect(result.isOvercast).toBe(false)
+    expect(result.cloudsPct).toBeNull()
+  })
+
+  it('flags isOvercast once cloud cover crosses the threshold, with an explanatory note', () => {
+    const clear = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 10 })
+    const overcast = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 90 })
+    expect(clear.isOvercast).toBe(false)
+    expect(clear.note).toBeUndefined()
+    expect(overcast.isOvercast).toBe(true)
+    expect(overcast.note).toMatch(/overcast/i)
+  })
+
+  it('reduces the UV index for the same sun position as cloud cover rises', () => {
+    const clear = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 0 })
+    const cloudy = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 90 })
+    expect(cloudy.uvIndex).toBeLessThan(clear.uvIndex)
+  })
+
+  it('does not change the geometric shadeFraction — clouds explain the number, they do not fudge it', () => {
+    const clear = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 0 })
+    const cloudy = computeShade({ points, osm: EMPTY_OSM, date: day, cloudsPct: 90 })
+    expect(cloudy.shadeFraction).toBe(clear.shadeFraction)
+  })
+})
+
 describe('computeShade — night', () => {
   it('returns shadeFraction 1 and isNight true well after sunset', () => {
     const points = linePoints(40.75, -73.99, 5)
