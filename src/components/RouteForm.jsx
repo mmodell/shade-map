@@ -283,7 +283,10 @@ export default function RouteForm({
           />
         ))}
 
-      {isLoaded && stops.length < MAX_STOPS && (
+      {/* Adding a stop only makes sense once there's a destination to insert
+          it before — showing the button any earlier is just clutter taking
+          up space in the common case of a form that's still being filled in. */}
+      {isLoaded && destination && stops.length < MAX_STOPS && (
         <button type="button" className="form__addstop" onClick={addStop}>
           + Add stop
         </button>

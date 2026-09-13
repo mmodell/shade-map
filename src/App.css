@@ -1193,6 +1193,28 @@
   }
   .form input {
     padding: 5px 8px;
+    background: rgba(11, 18, 32, 0.5);
+  }
+  /* The From/To fields are a closed-shadow-DOM Google web component, not a
+     plain <input> — `.form input` above never touched them at all, which is
+     most of why they stayed full-size (a ~50px Material text field) no
+     matter how much other padding got trimmed. `background-color`, `border`,
+     `border-radius` and `color-scheme` are the only properties Google
+     documents as settable on the host element itself; `::part(input)` /
+     `::part(input-container)` are undocumented but real — confirmed by
+     testing directly against the live component — and are what actually
+     let the internal padding shrink instead of just clipping the box. */
+  .pac-host gmp-place-autocomplete,
+  .pac-host .pac-el {
+    height: 36px;
+    font-size: 13px;
+    background-color: rgba(11, 18, 32, 0.5);
+    --gmp-mat-color-surface: rgba(11, 18, 32, 0.5);
+  }
+  gmp-place-autocomplete::part(input),
+  gmp-place-autocomplete::part(input-container) {
+    padding: 4px 8px;
+    min-height: 0;
   }
   .form__submit {
     padding: 8px;
