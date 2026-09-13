@@ -19,15 +19,27 @@ describe('computeSafety — per-point classification (pointSafety)', () => {
     expect(result.pointSafety).toEqual(['risk'])
   })
 
-  it('treats an unlit residential street at night as risk, but neutral in daytime', () => {
+  it('treats an unlit residential street as risk at night (visibility), but safe in daytime', () => {
     const matchedTags = [{ ...NIGHT_UNLIT_TAGS, lit: 'no' }]
     const lighting = { litFraction: 0 }
     const night = new Date('2026-09-23T04:00:00Z')
     const nightResult = computeSafety({ matchedTags, lighting, date: night, lat: 40.75, lng: -73.99 })
     expect(nightResult.pointSafety).toEqual(['risk'])
 
+    // A quiet residential street with no sidewalk tag (the OSM norm, not the
+    // exception) is an ordinary safe place to walk in daylight — treating
+    // "no tag" as "caution" here was the bug a real golf-community route
+    // exposed: it painted an entirely quiet, gated neighborhood yellow.
     const dayResult = computeSafety({ matchedTags, lighting, date: DAY, lat: 40.75, lng: -73.99 })
-    expect(dayResult.pointSafety).toEqual(['caution'])
+    expect(dayResult.pointSafety).toEqual(['safe'])
+  })
+
+  it('classifies quiet unclassified/service roads the same as residential in daytime', () => {
+    const lighting = { litFraction: 1 }
+    for (const highway of ['unclassified', 'service']) {
+      const result = computeSafety({ matchedTags: [{ highway }], lighting, date: DAY, lat: 40.75, lng: -73.99 })
+      expect(result.pointSafety).toEqual(['safe'])
+    }
   })
 
   it('classifies an unmatched point (no nearby way) as caution, not risk', () => {
@@ -63,6 +75,22 @@ describe('computeSafety — aggregate score and crime nudge', () => {
       lng: -73.99,
     })
     expect(good.score).toBeGreaterThan(bad.score)
+  })
+
+  it('scores an all-quiet-residential route as clearly safe, not merely neutral', () => {
+    const quiet = computeSafety({
+      matchedTags: [{ highway: 'residential' }, { highway: 'residential' }],
+      lighting,
+      date: DAY,
+      lat: 40.75,
+      lng: -73.99,
+    })
+    // 0.55 was the old flat "no signal either way" baseline for any road
+    // that wasn't explicitly tagged pedestrian-friendly — a real report from
+    // a private golf-community route (all quiet residential streets, no
+    // sidewalk tags anywhere) scoring only 55% is exactly the bug this
+    // guards against.
+    expect(quiet.score).toBeGreaterThan(0.7)
   })
 
   // Mid-range base score (mixed pedestrian/unmatched tags) on purpose, so a

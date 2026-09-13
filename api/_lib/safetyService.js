@@ -9,6 +9,13 @@ const PEDESTRIAN_HIGHWAYS = new Set([
   'track',
 ])
 const BIG_ROADS = new Set(['secondary', 'primary', 'trunk'])
+// Local/residential-character roads: low traffic by nature of the
+// classification itself, even though OSM contributors almost never bother
+// tagging sidewalk=yes on a quiet cul-de-sac or a private community road.
+// Treating "no sidewalk tag" the same on these as on an arterial road was
+// the bug — it painted ordinary quiet streets (private golf-community
+// roads included) as "caution" for no reason beyond missing metadata.
+const QUIET_HIGHWAYS = new Set(['residential', 'unclassified', 'service'])
 
 /* A rough "is this a pleasant/safe walk" score in 0..1, blending:
    - how much of the route has a sidewalk or is a dedicated pedestrian way
@@ -36,22 +43,25 @@ export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) 
   }
 
   let pedestrianFriendly = 0
+  let quietRoad = 0
   let exposedBigRoad = 0
   for (const tags of matched) {
     const hw = tags.highway
     const hasSidewalk = ['both', 'left', 'right', 'yes', 'separate'].includes(tags.sidewalk)
     if (PEDESTRIAN_HIGHWAYS.has(hw) || hasSidewalk) pedestrianFriendly++
+    else if (QUIET_HIGHWAYS.has(hw)) quietRoad++
     if (BIG_ROADS.has(hw) && !hasSidewalk) exposedBigRoad++
   }
   const pedShare = pedestrianFriendly / matched.length
+  const quietShare = quietRoad / matched.length
   const bigRoadShare = exposedBigRoad / matched.length
 
   let score
   if (isNight) {
     const lit = lighting.litFraction ?? 0.35
-    score = 0.2 + 0.5 * lit + 0.3 * pedShare - 0.2 * bigRoadShare
+    score = 0.2 + 0.5 * lit + 0.3 * pedShare + 0.15 * quietShare - 0.2 * bigRoadShare
   } else {
-    score = 0.55 + 0.4 * pedShare - 0.35 * bigRoadShare
+    score = 0.55 + 0.4 * pedShare + 0.25 * quietShare - 0.35 * bigRoadShare
   }
   score = Math.max(0, Math.min(1, score))
 
@@ -65,6 +75,7 @@ export function computeSafety({ matchedTags, lighting, date, lat, lng, crime }) 
 
   const notes = []
   if (pedShare > 0.7) notes.push('mostly sidewalks / paths')
+  else if (quietShare > 0.7) notes.push('mostly quiet residential streets')
   else if (bigRoadShare > 0.3) notes.push('runs along busy roads')
   if (isNight) notes.push(lighting.litFraction != null ? 'night — lighting weighted' : 'night')
   if (crime?.label) notes.push(`${crime.state} crime is ${crime.label}`)
@@ -88,12 +99,18 @@ function classifyPoint(tags, isNight) {
   const hasSidewalk = ['both', 'left', 'right', 'yes', 'separate'].includes(tags.sidewalk)
   const pedestrianFriendly = PEDESTRIAN_HIGHWAYS.has(hw) || hasSidewalk
   const exposedBigRoad = BIG_ROADS.has(hw) && !hasSidewalk
+  const quiet = QUIET_HIGHWAYS.has(hw)
   const lit = tags.lit === 'yes' || tags.lit === '24/7'
   const unlit = tags.lit === 'no'
 
   if (exposedBigRoad) return 'risk'
+  // Dark + unlit is worth flagging regardless of the neighborhood — this is
+  // about visibility, not road classification — so it's untouched by `quiet`.
   if (isNight && unlit && !pedestrianFriendly) return 'risk'
   if (pedestrianFriendly && (!isNight || lit)) return 'safe'
+  // A residential/local/service road in daylight doesn't need a sidewalk
+  // tag to be an ordinary, safe place to walk — most never get tagged.
+  if (quiet && !isNight) return 'safe'
   return 'caution'
 }
 
