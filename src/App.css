@@ -1071,6 +1071,35 @@
 
 /* ---------- responsive / phone ---------- */
 @media (max-width: 780px) {
+  /* A fixed, compact header height on phones (same whether the form is open
+     or collapsed) so it can be subtracted from 100vh below — the previous
+     58vh-panel + 42vh-map split ignored the header entirely, so the header's
+     own height pushed the whole page past one screen's worth of height on
+     every phone, on top of the panel simply being too tall to begin with.
+     (A custom property would be cleaner than repeating 44px, but a bare
+     `--header-h:` declaration isn't valid directly inside `@media` — it has
+     to live inside a ruleset — and this is only used four times below.) */
+  .app__header {
+    padding: 6px 14px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .app__header h1 {
+    font-size: 16px;
+  }
+  .app__mark {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    border-radius: 7px;
+  }
+  /* Decorative on a screen this size — cut permanently, not just once
+     results are showing, since it's most of what was pushing the fold down. */
+  .app__tag {
+    display: none;
+  }
+
   .app__body {
     display: flex;
     flex-direction: column;
@@ -1080,20 +1109,66 @@
     border-bottom: 1px solid var(--border);
     /* Explicit heights (not flex-grow) — flex-grow needs a definite size on
        an ancestor to resolve against, and min-height:100% chains through
-       several nested flex boxes don't reliably give it one on phones. */
-    height: 58vh;
+       several nested flex boxes don't reliably give it one on phones.
+       Sized as a share of the space actually left after the header, so
+       panel + map always add up to exactly one screen, never more. */
+    height: calc((100vh - 44px) * 0.52);
     flex: none;
+    padding: 8px 12px 6px;
   }
   .app__map {
-    height: 42vh;
+    height: calc((100vh - 44px) * 0.48);
     flex: none;
   }
   /* Form collapsed → hand most of the screen to the map. */
   .app--compact .app__panel {
-    height: 32vh;
+    height: calc((100vh - 44px) * 0.24);
   }
   .app--compact .app__map {
-    height: 65vh;
+    height: calc((100vh - 44px) * 0.76);
+  }
+
+  /* Tighter spacing throughout the form/results so the essentials (mode
+     row, From/To, Find routes) fit in the shorter panel without needing a
+     scroll first. */
+  .form {
+    gap: 4px;
+  }
+  .form__field {
+    gap: 2px;
+  }
+  .modes__btn {
+    padding: 5px 6px;
+    font-size: 12.5px;
+  }
+  .form input {
+    padding: 6px 9px;
+  }
+  .form__submit {
+    padding: 10px;
+  }
+  .form__weights-wrap > summary {
+    padding: 7px 10px;
+  }
+  .form__weights {
+    padding: 8px 10px;
+  }
+  .tripbar {
+    padding: 8px 10px;
+  }
+  /* Recent/saved-place shortcuts are a convenience, not something the form
+     needs to stay usable — cut on phones so the essentials aren't competing
+     with them for the shorter panel's height. */
+  .quick-row {
+    display: none;
+  }
+  .routes {
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .route {
+    padding: 10px;
+    gap: 6px;
   }
 }
 
