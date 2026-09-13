@@ -3,9 +3,27 @@ import { useEffect, useRef } from 'react'
 /* Wraps Google's current Places widget — google.maps.places.PlaceAutocompleteElement
    (the legacy google.maps.places.Autocomplete is closed to accounts created after
    March 2025). Fires onSelect({ text, location }) when a suggestion is chosen. */
-export default function PlaceField({ label, id, placeholder, onSelect, trailing }) {
+export default function PlaceField({ label, id, placeholder, onSelect, trailing, bias }) {
   const hostRef = useRef(null)
   const elRef = useRef(null)
+  // Read fresh inside the (async, run-once) mount effect without adding
+  // `bias` to its dependency array — recreating the widget on every bias
+  // change would drop whatever the user's mid-typing.
+  const biasRef = useRef(bias)
+  biasRef.current = bias
+
+  // Without a location bias, typing a category like "coffee" has no "near
+  // me" context the way it does in the actual Google Maps app — Places
+  // treats it as a near-exact name search and comes back empty for
+  // anything that isn't a literally-named match. Bias search around
+  // wherever the trip already anchors (current location, the chosen
+  // start, etc.) so generic keyword searches behave like a real search.
+  useEffect(() => {
+    if (elRef.current) {
+      elRef.current.locationBias = bias ? { center: bias, radius: 50000 } : null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bias?.lat, bias?.lng])
 
   useEffect(() => {
     let cancelled = false
@@ -27,6 +45,9 @@ export default function PlaceField({ label, id, placeholder, onSelect, trailing 
         if (placeholder) el.setAttribute('placeholder', placeholder)
       } catch {
         /* placeholder unsupported on this version — the <label> covers it */
+      }
+      if (biasRef.current) {
+        el.locationBias = { center: biasRef.current, radius: 50000 }
       }
       hostRef.current.replaceChildren(el)
       elRef.current = el

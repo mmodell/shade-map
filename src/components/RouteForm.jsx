@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PlaceField from './PlaceField'
 import MicButton from './MicButton'
 import { TRAVEL_MODES } from '../lib/googleDirections'
@@ -47,7 +47,27 @@ export default function RouteForm({
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(() => getSavedPlaces())
   const [recents, setRecents] = useState(() => getRecentPlaces())
+  const [dragIndex, setDragIndex] = useState(null)
   const nextStopId = useRef(0)
+  const dragInfo = useRef(null)
+  const autoLocateAttempted = useRef(false)
+
+  // Default the start point to current location, same as the real Google
+  // Maps app — the ◎ button and the ✕ on the resulting chip are still there
+  // for switching to a typed start, this just saves the tap for the common
+  // case. Only ever tried once per form load: re-running it every time the
+  // chip is cleared would fight the user right back into "Current location".
+  useEffect(() => {
+    if (autoLocateAttempted.current || !navigator.geolocation) return
+    autoLocateAttempted.current = true
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setGeoOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {
+        /* denied or unavailable — leave the From field for manual entry */
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }, [])
 
   const busy = status === 'loading'
   const originText = geoOrigin ? 'Current location' : origin?.text
@@ -65,6 +85,44 @@ export default function RouteForm({
   }
   function setStopValue(id, value) {
     setStops((s) => s.map((stop) => (stop.id === id ? { ...stop, value } : stop)))
+  }
+
+  // Drag-to-reorder for stops, via Pointer Events so the same code handles
+  // touch and mouse — plain HTML5 drag-and-drop doesn't fire on touch.
+  // Pointer capture (not a window listener) keeps move/up events targeted
+  // at the handle itself for the rest of the gesture, even once the cursor
+  // strays over a stop field's own widget — those can have their own
+  // internal event handling that would otherwise swallow the event before
+  // it bubbles. The dragged row's current index lives in a ref so
+  // onStopDragMove always reads the latest value without a stale closure.
+  function startStopDrag(e, index) {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragInfo.current = { index, pointerId: e.pointerId }
+    setDragIndex(index)
+  }
+  function onStopDragMove(e) {
+    const info = dragInfo.current
+    if (!info || e.pointerId !== info.pointerId) return
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const row = el?.closest('[data-stop-index]')
+    if (!row) return
+    const overIndex = Number(row.dataset.stopIndex)
+    if (overIndex === info.index) return
+    const fromIdx = info.index
+    setStops((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(overIndex, 0, moved)
+      return next
+    })
+    info.index = overIndex
+    setDragIndex(overIndex)
+  }
+  function onStopDragEnd(e) {
+    if (dragInfo.current && e.pointerId !== dragInfo.current.pointerId) return
+    dragInfo.current = null
+    setDragIndex(null)
   }
 
   function saveAs(kind, place) {
@@ -265,16 +323,36 @@ export default function RouteForm({
 
       {isLoaded &&
         stops.map((stop, i) => (
-          <PlaceStopField
+          <div
             key={stop.id}
-            id={`stop-${stop.id}`}
-            index={i}
-            stop={stop}
-            searchCenter={stopSearchCenter}
-            onSelect={(v) => setStopValue(stop.id, v)}
-            onRemove={() => removeStop(stop.id)}
-            onError={setError}
-          />
+            className={`stop-row${dragIndex === i ? ' stop-row--dragging' : ''}`}
+            data-stop-index={i}
+          >
+            {stops.length > 1 && (
+              <button
+                type="button"
+                className="stop-row__handle"
+                aria-label={`Drag to reorder stop ${i + 1}`}
+                onPointerDown={(e) => startStopDrag(e, i)}
+                onPointerMove={onStopDragMove}
+                onPointerUp={onStopDragEnd}
+                onPointerCancel={onStopDragEnd}
+              >
+                ⠿
+              </button>
+            )}
+            <div className="stop-row__field">
+              <PlaceStopField
+                id={`stop-${stop.id}`}
+                index={i}
+                stop={stop}
+                searchCenter={stopSearchCenter}
+                onSelect={(v) => setStopValue(stop.id, v)}
+                onRemove={() => removeStop(stop.id)}
+                onError={setError}
+              />
+            </div>
+          </div>
         ))}
 
       {/* Adding a stop is for inserting one into a trip you already have,
@@ -327,6 +405,7 @@ export default function RouteForm({
           placeholder="Address or place"
           onSelect={setDestination}
           trailing={<MicButton onSelect={setDestination} onError={setError} />}
+          bias={geoOrigin || origin?.location}
         />
       ) : (
         <LoadingField label="To" />
@@ -482,6 +561,7 @@ function PlaceStopField({ id, index, stop, searchCenter, onSelect, onRemove, onE
           onSelect(v)
           setResults(null)
         }}
+        bias={searchCenter}
         trailing={
           <>
             <MicButton onSelect={onSelect} onError={onError} />

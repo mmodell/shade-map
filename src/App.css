@@ -342,6 +342,48 @@
   color: var(--text-dim);
 }
 
+.stop-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.stop-row__field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.stop-row__handle {
+  flex: none;
+  width: 26px;
+  height: 36px;
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.stop-row__handle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.stop-row--dragging {
+  opacity: 0.6;
+}
+.stop-row--dragging .stop-row__handle {
+  cursor: grabbing;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .swap-btn {
   align-self: flex-end;
   margin: -8px 2px -2px 0;
