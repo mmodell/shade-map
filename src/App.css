@@ -813,11 +813,30 @@
 .map__legend-sep {
   color: var(--border);
 }
+.map__legend-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+}
+.map__legend-grouplabel {
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
 .map__swatch {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   display: inline-block;
+}
+.map__swatch--ring {
+  background: transparent;
+  border: 2px solid currentColor;
+  width: 7px;
+  height: 7px;
 }
 
 /* Chips + legend stack in normal flow inside this one positioned wrapper,
@@ -1220,15 +1239,28 @@
      let the internal padding shrink instead of just clipping the box. */
   .pac-host gmp-place-autocomplete,
   .pac-host .pac-el {
-    height: 36px;
+    height: 36px !important;
+    overflow: hidden;
     font-size: 13px;
-    background-color: rgba(11, 18, 32, 0.5);
+    background-color: rgba(11, 18, 32, 0.5) !important;
     --gmp-mat-color-surface: rgba(11, 18, 32, 0.5);
   }
   gmp-place-autocomplete::part(input),
   gmp-place-autocomplete::part(input-container) {
-    padding: 4px 8px;
-    min-height: 0;
+    padding: 4px 8px !important;
+    min-height: 0 !important;
+    background: transparent !important;
+  }
+  /* The "Current location" state (after tapping ◎) swaps the web component
+     out for a plain styled chip instead — a completely different element
+     that the sizing/transparency rules above never touch. Missed this the
+     first time: it was still full-size and fully opaque regardless of
+     anything done to the address fields themselves. */
+  .pac-chip {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 13px;
+    background: rgba(11, 18, 32, 0.5);
   }
   .form__submit {
     padding: 8px;

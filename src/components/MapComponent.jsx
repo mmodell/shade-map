@@ -502,12 +502,22 @@ export default function MapComponent({
 
         {(shadeSegments || safetySegments) && (
           <div className="map__legend">
-            <span><i className="map__swatch" style={{ background: SHADE_COLORS.shade }} /> Shade</span>
-            <span><i className="map__swatch" style={{ background: SHADE_COLORS.sun }} /> Sun</span>
+            {/* Swatches mirror the actual route rendering: a solid dot for
+                the center line (shade), a hollow ring for the outer edge
+                (safety) — plus a group label, since the two-tone route
+                itself doesn't explain which layer is which. */}
+            <span className="map__legend-group">
+              <span className="map__legend-grouplabel">Center</span>
+              <span><i className="map__swatch" style={{ background: SHADE_COLORS.shade }} /> Shade</span>
+              <span><i className="map__swatch" style={{ background: SHADE_COLORS.sun }} /> Sun</span>
+            </span>
             <span className="map__legend-sep">·</span>
-            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.safe }} /> Safe</span>
-            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.caution }} /> Caution</span>
-            <span><i className="map__swatch" style={{ background: SAFETY_COLORS.risk }} /> Risk</span>
+            <span className="map__legend-group">
+              <span className="map__legend-grouplabel">Edge</span>
+              <span><i className="map__swatch map__swatch--ring" style={{ borderColor: SAFETY_COLORS.safe }} /> Safe</span>
+              <span><i className="map__swatch map__swatch--ring" style={{ borderColor: SAFETY_COLORS.caution }} /> Caution</span>
+              <span><i className="map__swatch map__swatch--ring" style={{ borderColor: SAFETY_COLORS.risk }} /> Risk</span>
+            </span>
           </div>
         )}
       </div>

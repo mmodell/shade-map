@@ -104,7 +104,7 @@ async function reverseGeocodeState(lat, lng) {
     `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=5&addressdetails=1`,
     {
       headers: { 'User-Agent': 'shade-map-app (personal project, contact via github.com/mmodell)' },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(2500),
     }
   )
   if (!res.ok) return null
@@ -114,9 +114,16 @@ async function reverseGeocodeState(lat, lng) {
   return null
 }
 
+// Crime is a best-effort nudge on top of the main safety score (see the note
+// atop this file), and the FBI's API has turned out to be unreliable enough
+// in practice that it's often the slowest leg of a search — geocode (up to
+// 2.5s) then, sequentially, two FBI calls (up to 3s each, but in parallel
+// with each other) meant a route search could be stuck waiting up to 14s on
+// a nudge that fails silently anyway. Timeouts are deliberately short: a
+// fast failure and no crime nudge is strictly better than a slow one.
 async function safeJson(url) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return null
     return await res.json()
   } catch {

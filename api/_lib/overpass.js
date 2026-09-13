@@ -67,7 +67,11 @@ async function runQuery(q) {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: 'data=' + encodeURIComponent(q),
-        signal: AbortSignal.timeout(26000),
+        // A slow-but-working mirror can legitimately take several seconds
+        // for a complex query, but 26s before even trying the next mirror
+        // (of 3, tried one at a time) meant one degraded/unreachable mirror
+        // could stall an entire search for the better part of a minute.
+        signal: AbortSignal.timeout(12000),
       })
       if (!res.ok) throw new Error(`overpass ${res.status}`)
       return await res.json()

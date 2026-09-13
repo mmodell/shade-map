@@ -283,10 +283,12 @@ export default function RouteForm({
           />
         ))}
 
-      {/* Adding a stop only makes sense once there's a destination to insert
-          it before — showing the button any earlier is just clutter taking
-          up space in the common case of a form that's still being filled in. */}
-      {isLoaded && destination && stops.length < MAX_STOPS && (
+      {/* Adding a stop is for inserting one into a trip you already have,
+          not something offered while still building the first search —
+          gated on an actual found route (not just a picked destination),
+          so it only ever shows once you've reopened an existing result to
+          change it. */}
+      {isLoaded && status === 'done' && stops.length < MAX_STOPS && (
         <button type="button" className="form__addstop" onClick={addStop}>
           + Add stop
         </button>
