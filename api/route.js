@@ -1,12 +1,14 @@
 import { fetchOsmFeatures } from './_lib/overpass.js'
 import { matchHighways } from './_lib/wayMatch.js'
-import { computeShade } from './_lib/shadeCalculator.js'
+import { prepareShade, evaluateShade, shadeCurve } from './_lib/shadeCalculator.js'
+import { departureWindow } from './_lib/sun.js'
 import { computeLighting } from './_lib/lightingService.js'
 import { computeSafety } from './_lib/safetyService.js'
 import { getWeather } from './_lib/weatherService.js'
 import { getStateCrimeContext } from './_lib/crimeService.js'
 
 const MAX_ROUTES = 4
+const CURVE_CLOUD_GAP_MS = 4 * 60 * 60 * 1000 // forecast steps are ~3h apart
 const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildings: [] }
 
 export default async function handler(req, res) {
@@ -28,7 +30,11 @@ export default async function handler(req, res) {
   const rawRoutes = Array.isArray(body?.routes) ? body.routes.slice(0, MAX_ROUTES) : []
   if (!rawRoutes.length) return res.status(400).json({ error: 'No routes provided' })
 
-  const routes = rawRoutes.map((r) => ({ id: r.id, points: sanitizePoints(r.points) }))
+  const routes = rawRoutes.map((r) => ({
+    id: r.id,
+    points: sanitizePoints(r.points),
+    durationSeconds: sanitizeDuration(r.durationSeconds),
+  }))
   const refPoints = routes[0]?.points || []
   const refMid = refPoints[Math.floor(refPoints.length / 2)] || refPoints[0] || null
   const allPoints = routes.flatMap((r) => r.points)
@@ -56,17 +62,26 @@ export default async function handler(req, res) {
   const { osm, ok: osmOk } = osmResult
   const cloudsPct = nearestCloudsPct(weather, date)
 
-  const analyzed = routes.map(({ id, points }) => {
+  const analyzed = routes.map(({ id, points, durationSeconds }) => {
     if (points.length < 2) {
       return { id, shade: nightSafeDefault(), safety: { score: 0.5 }, lighting: null }
     }
     const mid = points[Math.floor(points.length / 2)]
 
     const matched = matchHighways(points, osm.highways)
-    const shade = computeShade({ points, osm, date, cloudsPct })
+    const shadeCtx = prepareShade({ points, osm })
+    const shade = evaluateShade(shadeCtx, { date, durationSeconds, cloudsPct })
     if (!osmOk) {
       shade.note = 'Map data was unavailable — shade estimated from sun angle only.'
       shade.greenCoverage = null
+    } else {
+      // Same route, every departure time of the day: the "when should I
+      // leave" curve. Reuses the prepared geometry, so it's cheap.
+      shade.byDeparture = shadeCurve(shadeCtx, {
+        dates: departureWindow(date, mid.lat, mid.lng),
+        durationSeconds,
+        cloudsAt: (d) => nearestCloudsPct(weather, d, CURVE_CLOUD_GAP_MS),
+      })
     }
     const lighting = computeLighting({ matchedTags: matched, date, lat: mid.lat, lng: mid.lng })
     const safety = computeSafety({ matchedTags: matched, lighting, date, lat: mid.lat, lng: mid.lng, crime })
@@ -95,7 +110,7 @@ function sanitizePoints(points) {
 // The weather timeline has one point per forecast step (plus "now") — find
 // whichever is closest to the requested departure time and use its cloud
 // cover for the shade calculation, rather than always assuming clear sky.
-function nearestCloudsPct(weather, date) {
+function nearestCloudsPct(weather, date, maxGapMs = Infinity) {
   if (!weather?.points?.length) return null
   const target = date.getTime()
   let best = null
@@ -108,7 +123,11 @@ function nearestCloudsPct(weather, date) {
       bestDiffMs = diffMs
     }
   }
-  return best ? best.clouds : null
+  return best && bestDiffMs <= maxGapMs ? best.clouds : null
+}
+
+function sanitizeDuration(s) {
+  return Number.isFinite(s) && s > 0 ? Math.min(s, 6 * 3600) : 0
 }
 
 function parseDate(iso) {

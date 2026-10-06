@@ -24,7 +24,8 @@ const HIGHWAY_QUERY =
   'way["highway"~"footway|path|pedestrian|steps|cycleway|living_street|residential|service|unclassified|tertiary|secondary|primary|track"]'
 
 /* Returns { greenAreas: [[latlng]], greenLines: [[latlng]], trees: [latlng],
-   highways: [{ path:[latlng], tags }], buildings: [{lat,lng,heightM}] } for
+   highways: [{ path:[latlng], tags }],
+   buildings: [{lat,lng,heightM,ring?:[[lat,lng]]}] } for
    the given bbox. `points` can span several route alternatives at once —
    pass their combined points to fetch one shared dataset instead of one per
    route. `heightM` is real when OSM has height/building:levels tagged,
@@ -43,7 +44,7 @@ export async function fetchOsmFeatures(points) {
 );
 out geom tags;
 way["building"](${box});
-out tags center;`
+out geom tags;`
 
     const json = await runQuery(q)
     return parse(json)
@@ -91,12 +92,23 @@ function parse(json) {
 
   for (const el of json.elements || []) {
     const tags = el.tags || {}
-    // Buildings come back from the separate `out tags center;` clause — a
-    // computed centroid instead of full geometry (we only need a point +
-    // height to cast a shadow from, not the building's actual footprint),
-    // with height/building:levels for how far that shadow reaches.
-    if (el.type === 'way' && el.center && !el.geometry) {
-      buildings.push({ lat: el.center.lat, lng: el.center.lon, heightM: buildingHeightMeters(tags) })
+    // Buildings come back with their full footprint so shadows can be
+    // ray-cast against the real outline (a long slab shades very differently
+    // from a point), plus height/building:levels for how far it reaches.
+    // A bare centre point (older cached data) still works as a fallback.
+    if (el.type === 'way' && tags.building) {
+      if (el.geometry && el.geometry.length >= 3) {
+        const ring = el.geometry.map((g) => [g.lat, g.lon])
+        let sLat = 0
+        let sLng = 0
+        for (const [la, ln] of ring) {
+          sLat += la
+          sLng += ln
+        }
+        buildings.push({ lat: sLat / ring.length, lng: sLng / ring.length, heightM: buildingHeightMeters(tags), ring })
+      } else if (el.center) {
+        buildings.push({ lat: el.center.lat, lng: el.center.lon, heightM: buildingHeightMeters(tags) })
+      }
       continue
     }
     if (el.type === 'node' && tags.natural === 'tree') {

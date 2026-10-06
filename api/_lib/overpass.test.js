@@ -44,3 +44,32 @@ describe('fetchOsmFeatures caching', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('fetchOsmFeatures building footprints', () => {
+  it('keeps the outline of each building plus its height, and tolerates a bare centre', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        elements: [
+          {
+            type: 'way',
+            tags: { building: 'yes', 'building:levels': '10' },
+            geometry: [
+              { lat: 1, lon: 1 }, { lat: 1, lon: 1.001 }, { lat: 1.001, lon: 1.001 }, { lat: 1.001, lon: 1 }, { lat: 1, lon: 1 },
+            ],
+          },
+          { type: 'way', tags: { building: 'house', height: '7' }, center: { lat: 2, lon: 2 } },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const base = 60 + Math.random() * 10
+    const osm = await fetchOsmFeatures([{ lat: base, lng: base }])
+    expect(osm.buildings).toHaveLength(2)
+    expect(osm.buildings[0].ring).toHaveLength(5)
+    expect(osm.buildings[0].heightM).toBeCloseTo(32)
+    expect(osm.buildings[1].ring).toBeUndefined()
+    expect(osm.buildings[1].heightM).toBe(7)
+    expect(osm.greenAreas).toHaveLength(0) // buildings never leak into the green-area bucket
+  })
+})

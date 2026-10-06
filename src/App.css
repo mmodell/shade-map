@@ -1384,3 +1384,89 @@
 .pac-container {
   z-index: 9999;
 }
+
+
+/* ---------- shade-by-departure chart ---------- */
+.flip {
+  margin-top: 12px;
+  padding: 10px 12px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.flip__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.flip__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.flip__busy {
+  font-size: 11px;
+  color: var(--sun);
+}
+.flip__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.flip__night {
+  fill: rgba(2, 6, 23, 0.55);
+}
+.flip__grid {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 3;
+}
+.flip__axis {
+  fill: var(--text-dim);
+  font-size: 8.5px;
+}
+.flip__now {
+  stroke: var(--sun);
+  stroke-width: 1;
+  opacity: 0.8;
+}
+.flip__nowdot {
+  fill: var(--sun);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.flip__best {
+  fill: none;
+  stroke: var(--accent-bright);
+  stroke-width: 2;
+}
+.flip__msg {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.flip__msg strong {
+  color: var(--text);
+}
+.flip__go {
+  margin-left: 2px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-dim);
+  background: rgba(34, 197, 94, 0.14);
+  color: var(--accent-bright);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.flip__go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
