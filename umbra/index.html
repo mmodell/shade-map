@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Umbra — walk the shade</title>
+<meta name="theme-color" content="#070b12">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="ov"></canvas>
+
+<header>
+  <div class="brand"><span class="logo">◐</span> UMBRA <em>the city's shade, in real time</em></div>
+  <div class="tools">
+    <button id="thermalBtn" title="Thermal view (T)">Thermal</button>
+    <button id="reroll" title="Generate a new city">New city</button>
+    <button id="menu" class="only-mobile">Controls</button>
+  </div>
+</header>
+
+<aside id="panel">
+  <label>Where on Earth
+    <select id="place"></select>
+  </label>
+  <label>Date <b id="daylabel"></b> <span id="daylight" class="dim"></span>
+    <input id="day" type="range" min="1" max="365" step="1">
+  </label>
+  <label>Shade-seeking <span class="dim">how much detour you'll accept</span>
+    <input id="seek" type="range" min="0" max="12" step="0.5">
+  </label>
+  <div class="row"><button id="swap">⇄ Swap A / B</button></div>
+  <div id="stats"></div>
+  <p class="hint small">Drag to orbit · scroll to zoom · shift-drag to pan · tap the city to move A / B · <kbd>space</kbd> play · <kbd>T</kbd> thermal</p>
+</aside>
+
+<div id="hint">Tap anywhere to set <b>A</b> and <b>B</b> — then scrub time and watch the safest route swim through the shade.</div>
+
+<footer>
+  <div id="best"></div>
+  <div class="chartwrap">
+    <canvas id="chart"></canvas>
+    <div class="legend"><span class="o">━ shortest</span><span class="c">━ coolest</span> <span class="dim">% of the walk in direct sun, by departure time</span></div>
+  </div>
+  <canvas id="daystrip"></canvas>
+  <div class="scrub">
+    <button id="play" aria-label="Play day">▶</button>
+    <div class="slider">
+      <input id="time" type="range" min="0" max="24" step="0.01" value="13">
+      <div id="playhead"></div>
+    </div>
+    <div class="clock"><b id="clock">13:00</b><span id="sunmeta"></span></div>
+  </div>
+</footer>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

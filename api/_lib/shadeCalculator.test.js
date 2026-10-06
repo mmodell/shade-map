@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeShade } from './shadeCalculator.js'
+import { computeShade, prepareShade, shadeCurve, isShadowedByFootprint } from './shadeCalculator.js'
+import { departureWindow } from './sun.js'
 
 const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildings: [] }
 
@@ -117,5 +118,116 @@ describe('computeShade — night', () => {
     expect(result.isNight).toBe(true)
     expect(result.shadeFraction).toBe(1)
     expect(result.pointShade.every((s) => s === 'shade')).toBe(true)
+  })
+})
+
+describe('footprint shadows', () => {
+  // A 30m-wide, 10m-deep slab, 24m tall, centred on the origin of a local
+  // metric frame. Sun due east (dx=1,dy=0) at 30 degrees → shadow reaches
+  // 24 / tan(30deg) ≈ 41.6m west of the slab's west face.
+  const ring = [
+    { x: -15, y: -5 }, { x: 15, y: -5 }, { x: 15, y: 5 }, { x: -15, y: 5 },
+  ]
+  const slab = { ring, minX: -15, maxX: 15, minY: -5, maxY: 5, heightM: 24 }
+  const tan30 = Math.tan((30 * Math.PI) / 180)
+
+  it('shades points behind the slab out to height / tan(altitude), and no further', () => {
+    // sun in the WEST here: dx=-1 means "toward the sun"; points to the east of the slab are shaded
+    const toSun = [-1, 0]
+    expect(isShadowedByFootprint({ x: 15 + 30, y: 0 }, slab, toSun[0], toSun[1], tan30)).toBe(true)
+    expect(isShadowedByFootprint({ x: 15 + 50, y: 0 }, slab, toSun[0], toSun[1], tan30)).toBe(false)
+  })
+  it('only shades the strip the footprint actually covers — not a wide cone', () => {
+    const toSun = [-1, 0]
+    // 12m off the slab's centreline in y: outside its 10m depth → full sun
+    expect(isShadowedByFootprint({ x: 30, y: 12 }, slab, toSun[0], toSun[1], tan30)).toBe(false)
+    expect(isShadowedByFootprint({ x: 30, y: 3 }, slab, toSun[0], toSun[1], tan30)).toBe(true)
+  })
+  it('does not shade the sun-facing side', () => {
+    expect(isShadowedByFootprint({ x: -30, y: 0 }, slab, -1, 0, tan30)).toBe(false)
+  })
+  it('a low building casts a shorter shadow than a tall one at the same sun angle', () => {
+    const low = { ...slab, heightM: 6 }
+    const p = { x: 15 + 20, y: 0 }
+    expect(isShadowedByFootprint(p, low, -1, 0, tan30)).toBe(false) // 6/tan30 ≈ 10m
+    expect(isShadowedByFootprint(p, slab, -1, 0, tan30)).toBe(true)
+  })
+
+  it('computeShade uses footprints: a point behind a long slab is shaded, one beside it is not', () => {
+    const lat = 40.75, lng = -73.99
+    const mPerLat = 111320, mPerLng = 111320 * Math.cos((lat * Math.PI) / 180)
+    const at = (x, y) => ({ lat: lat + y / mPerLat, lng: lng + x / mPerLng })
+    // 60m-wide (E-W) x 10m-deep slab, 30m tall
+    const slabRing = [at(-30, -5), at(30, -5), at(30, 5), at(-30, 5)].map((p) => [p.lat, p.lng])
+    const osm = { ...EMPTY_OSM, buildings: [{ ...at(0, 0), heightM: 30, ring: slabRing }] }
+    // Sun in the south-ish evening: pick the date where azimuth ≈ south and altitude ≈ 35° (noon in late March)
+    const noon = new Date('2026-03-20T17:00:00Z')
+    const north = at(0, 25) // directly north of the slab: in its shadow with the sun to the south
+    const wayWest = at(-80, 25) // north of where the slab ends: out of its shadow
+    const res = computeShade({ points: [north, wayWest], osm, date: noon })
+    expect(res.pointShade[0]).toBe('shade')
+    expect(res.pointShade[1]).toBe('sun')
+  })
+})
+
+describe('time-aware shade', () => {
+  const lat = 40.75, lng = -73.99
+  const mPerLat = 111320, mPerLng = 111320 * Math.cos((lat * Math.PI) / 180)
+  const at = (x, y) => ({ lat: lat + y / mPerLat, lng: lng + x / mPerLng })
+  const tower = [at(-8, -8), at(8, -8), at(8, 8), at(-8, 8)].map((p) => [p.lat, p.lng])
+  const osm = { ...EMPTY_OSM, buildings: [{ ...at(0, 0), heightM: 40, ring: tower }] }
+  const westSide = [at(-30, 0), at(-31, 0)]
+  const eastSide = [at(30, 0), at(31, 0)]
+  const morning = new Date('2026-09-23T12:30:00Z') // sun in the east
+  const evening = new Date('2026-09-23T21:30:00Z') // sun in the west
+
+  it("a spot's shade flips from one side of the tower to the other over the day", () => {
+    expect(computeShade({ points: westSide, osm, date: morning }).shadeFraction).toBe(1)
+    expect(computeShade({ points: westSide, osm, date: evening }).shadeFraction).toBe(0)
+    expect(computeShade({ points: eastSide, osm, date: morning }).shadeFraction).toBe(0)
+    expect(computeShade({ points: eastSide, osm, date: evening }).shadeFraction).toBe(1)
+  })
+
+  it('uses the sun at arrival: a long route that crosses sunset ends in shade', () => {
+    // 20 points over ~600m, with the walk taking 3 hours starting 90 min before sunset
+    const long = Array.from({ length: 20 }, (_, i) => at(i * 30, 400))
+    const before = new Date('2026-09-23T21:30:00Z')
+    const quick = computeShade({ points: long, osm: EMPTY_OSM, date: before, durationSeconds: 60 })
+    const slow = computeShade({ points: long, osm: EMPTY_OSM, date: before, durationSeconds: 3 * 3600 })
+    expect(quick.shadeFraction).toBe(0)
+    expect(slow.shadeFraction).toBeGreaterThan(0.3) // dusk falls partway along it
+    expect(slow.isNight).toBe(false)
+    expect(slow.note).toMatch(/sun sets/i)
+  })
+
+  it('shadeCurve returns one sample per departure and finds the shady hour', () => {
+    const ctx = prepareShade({ points: westSide, osm })
+    const dates = [morning, evening]
+    const curve = shadeCurve(ctx, { dates })
+    expect(curve.map((c) => c.shadeFraction)).toEqual([1, 0])
+    expect(curve[0].t).toBe(morning.toISOString())
+  })
+
+  it('shadeCurve is night-aware', () => {
+    const ctx = prepareShade({ points: westSide, osm })
+    const [c] = shadeCurve(ctx, { dates: [new Date('2026-09-23T05:00:00Z')] })
+    expect(c.isNight).toBe(true)
+    expect(c.shadeFraction).toBe(1)
+  })
+})
+
+describe('departureWindow', () => {
+  it('spans sunrise to sunset in 30-minute steps', () => {
+    const w = departureWindow(new Date('2026-09-23T17:00:00Z'), 40.75, -73.99)
+    expect(w.length).toBeGreaterThan(20)
+    expect(w.length).toBeLessThanOrEqual(49)
+    for (let i = 1; i < w.length; i++) expect(w[i] - w[i - 1]).toBe(30 * 60 * 1000)
+    const mid = w[Math.floor(w.length / 2)]
+    expect(Math.abs(mid - new Date('2026-09-23T17:00:00Z'))).toBeLessThan(3 * 3600e3)
+  })
+  it("moves to tomorrow once tonight's sun has set", () => {
+    const night = new Date('2026-09-24T03:00:00Z') // 11pm New York
+    const w = departureWindow(night, 40.75, -73.99)
+    expect(w[0].getTime()).toBeGreaterThan(night.getTime())
   })
 })

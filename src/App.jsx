@@ -4,6 +4,7 @@ import RouteForm from './components/RouteForm'
 import MapComponent from './components/MapComponent'
 import WeatherTimeline from './components/WeatherTimeline'
 import RouteList from './components/RouteList'
+import ShadeFlipChart from './components/ShadeFlipChart'
 import RouteSteps from './components/RouteSteps'
 import Navigator from './components/Navigator'
 import { requestRoutes, samplePath, routeSummary } from './lib/googleDirections'
@@ -59,6 +60,7 @@ export default function App() {
   const [panelMode, setPanelMode] = useState(() => (restored?.status !== 'done' ? 'form' : 'collapsed'))
   const [trip, setTrip] = useState(() => restored?.trip || null)
   const [navigating, setNavigating] = useState(false)
+  const [scrubbing, setScrubbing] = useState(false)
   const [userPos, setUserPos] = useState(null)
   const [focusedStepIndex, setFocusedStepIndex] = useState(null)
   const pathsRef = useRef(new Map(restored?.paths || []))
@@ -197,6 +199,45 @@ export default function App() {
       }
     },
     [departure, arriveBy]
+  )
+
+  // "Leave at …" from the shade chart: re-analyze the routes already on screen
+  // for a different departure time. No new Directions search — the geometry
+  // doesn't change, only where the sun will be.
+  const scrubDeparture = useCallback(
+    async (date) => {
+      if (!analyzed.length || scrubbing) return
+      setScrubbing(true)
+      try {
+        const analysis = await analyzeRoutes({ candidates: analyzed, departure: date })
+        const primary = analysis.routes[0]
+        const seconds = primary?.durationInTrafficSeconds || primary?.durationSeconds || 0
+        const arrival = new Date(date.getTime() + seconds * 1000)
+        setAnalyzed(analysis.routes)
+        setMeta({
+          degraded: analysis.degraded,
+          degradedReason: analysis.degradedReason,
+          weather: analysis.weather,
+          crime: analysis.crime,
+        })
+        // Picking a time to leave is a departure choice, whatever the
+        // original search was anchored on.
+        setArriveBy(false)
+        setDeparture(date)
+        setResolvedDeparture(date)
+        setResolvedArrival(arrival)
+        setTrip((t) =>
+          t
+            ? { ...t, arriveBy: false, resolvedDeparture: date.toISOString(), resolvedArrival: arrival.toISOString() }
+            : t
+        )
+      } catch {
+        // leave the current results as they were
+      } finally {
+        setScrubbing(false)
+      }
+    },
+    [analyzed, scrubbing]
   )
 
   // Re-run Directions from the live position to the same destination —
@@ -358,6 +399,15 @@ export default function App() {
                     routes={ranked}
                     selectedId={selected?.id}
                     onSelect={setSelectedId}
+                  />
+                  <ShadeFlipChart
+                    routes={ranked}
+                    selectedId={selected?.id}
+                    departure={resolvedDeparture}
+                    onScrub={scrubDeparture}
+                    busy={scrubbing}
+                    utcOffsetSeconds={meta.weather?.utcOffsetSeconds ?? null}
+                    placeName={meta.weather?.location?.name ?? null}
                   />
                   {selected && !navigating && (
                     <button

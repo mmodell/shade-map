@@ -9,6 +9,8 @@ for the time you're actually leaving — then open it on your phone from anywher
 - **Install:** it's a PWA — "Add to Home Screen" and it behaves like an app
 - **Cost:** $0 (Google Maps free tier + OpenWeather free tier + Vercel Hobby)
 
+> **Also in this repo:** [`umbra/`](umbra/README.md) — a keyless, build-free 3D sandbox of the same idea: a procedural city lit by the real sun with ray-traced shadows and a shade-seeking router.
+
 ---
 
 ## 1. Prerequisites
@@ -92,25 +94,42 @@ Grant location permission when prompted so the ◎ button can fill in "From".
 
 ---
 
-## How the shade score works (heuristic)
+## How the shade score works
 
-For each route the analyzer samples the path every ~40 m and computes:
+For each route the analyzer samples the path every ~40 m and decides, point by point,
+whether you'd be standing in shade:
 
-- **Canopy shade** — share of sample points inside an OSM park / wood / garden /
-  tree row / hedge (≈85% shade weight).
-- **Street shade** — buildings beside the path (OSM building density in the route
-  corridor) weighted **up as the sun gets lower** (long shadows near sunrise/sunset,
-  almost none at solar noon).
-- `shadeFraction = canopy + (1 − canopy) × street`
-- After sunset `shadeFraction = 1` and the score leans on **lighting** (`lit=yes`
-  ways) and **safety** instead.
+- **Canopy shade** — the point is inside an OSM park / wood / garden / tree row / hedge,
+  or within a few metres of a mapped tree.
+- **Building shadows, ray-cast from real footprints** — from each point a ray is traced
+  toward the sun. If it enters a building's outline at distance *s* and the building is
+  taller than *s · tan(sun altitude)*, you're in its shadow. A long slab shades the whole
+  frontage behind it; a narrow tower shades a thin stripe; the side of the street flips as
+  the sun moves. Heights come from OSM `height` / `building:levels` (default ≈ 12 m).
+  Buildings with only a centre point fall back to a directional cone.
+- **Time-aware** — each point is evaluated with the sun where it will be when you *reach*
+  it (route duration × distance along the route), so a long walk that crosses sunset or
+  slides out of a shadow is scored honestly.
+- After dark `shadeFraction = 1` and the score leans on **lighting** and **safety**.
 
-**Safety** blends how much of the route is sidewalk / dedicated footpath vs.
-exposed alongside a big road, plus lighting at night.
+`shadeFraction` is the share of sample points in shade. Clouds explain the number (a note
+and a lower UV index) but never fudge it.
 
-The three sliders re-rank instantly without re-querying. It's an estimate, not a
-sun-position ray-trace — good for *comparing* routes, not for claiming an exact
-percentage.
+### "When should I leave?" chart
+
+The same prepared geometry is re-evaluated for every departure time from sunrise to sunset
+in 30-minute steps (`shade.byDeparture`, ~0.2 s for four routes in a dense city). The chart
+in the results panel plots each route's shade share across the day, marks the shadiest
+time, and tapping it re-analyzes the *same routes* for that departure — no new Directions
+search. Wherever the lines cross is a moment the best route changes.
+
+**Safety** blends how much of the route is sidewalk / dedicated footpath vs. exposed
+alongside a big road, plus lighting at night.
+
+The three sliders re-rank instantly without re-querying. It's still a model — OSM
+footprints are missing or mis-heighted in places, trees are circles, and nothing here
+knows about awnings — so treat it as good for *comparing* routes, not for claiming an
+exact percentage.
 
 ## Project layout
 
@@ -120,7 +139,7 @@ Shade Map/
 │  ├─ route.js                 # POST /api/route — the analyzer
 │  └─ _lib/                    # (underscore = not a route)
 │     ├─ overpass.js           # OpenStreetMap (Overpass) query + parse
-│     ├─ shadeCalculator.js    # sun angle + canopy + street-shade heuristic
+│     ├─ shadeCalculator.js    # footprint shadow ray-casting, time-aware, per-departure curve
 │     ├─ lightingService.js    # lit=yes coverage
 │     ├─ safetyService.js      # sidewalk vs. big-road, night lighting
 │     ├─ weatherService.js     # OpenWeather current + 3h/5d forecast
@@ -132,11 +151,13 @@ Shade Map/
 │  │  ├─ RouteForm.jsx         # from / to / time / sliders
 │  │  ├─ MapComponent.jsx      # Google map + route polylines
 │  │  ├─ RouteList.jsx         # ranked cards
+│  │  ├─ ShadeFlipChart.jsx    # shade vs. departure time; tap to leave then
 │  │  └─ WeatherTimeline.jsx   # weather strip over the walk window
 │  └─ lib/
 │     ├─ googleDirections.js   # DirectionsService + path sampling
 │     ├─ analyze.js            # calls /api/route, degrades gracefully
 │     ├─ ranking.js            # slider weights → composite score
+│     ├─ shadeCurve.js         # best-departure / spread helpers for the chart
 │     ├─ localShadeEstimate.js # offline fallback (sun angle only)
 │     └─ format.js
 ├─ public/  (icon.svg, manifest.webmanifest, sw.js)

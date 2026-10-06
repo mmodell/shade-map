@@ -88,3 +88,25 @@ export function pathLengthMeters(points) {
   for (let i = 1; i < points.length; i++) total += haversine(points[i - 1], points[i])
   return total
 }
+
+/* Distance along a ray (origin px,py; unit direction dx,dy) at which it first
+   enters a polygon ring ([{x,y}]) — 0 when the origin is already inside,
+   Infinity when the ray never touches it. */
+export function rayPolygonEntry(px, py, dx, dy, ring) {
+  if (pointInRing({ x: px, y: py }, ring)) return 0
+  let best = Infinity
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[j]
+    const b = ring[i]
+    const ex = b.x - a.x
+    const ey = b.y - a.y
+    const denom = dx * ey - dy * ex
+    if (Math.abs(denom) < 1e-12) continue // ray parallel to this edge
+    const ax = a.x - px
+    const ay = a.y - py
+    const s = (ax * ey - ex * ay) / denom
+    const u = (ax * dy - ay * dx) / denom
+    if (s >= 0 && s < best && u >= 0 && u <= 1) best = s
+  }
+  return best
+}

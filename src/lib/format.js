@@ -29,3 +29,27 @@ export function formatTemp(value, units) {
   if (value == null) return '—'
   return `${Math.round(value)}°${units === 'metric' ? 'C' : 'F'}`
 }
+
+/* Clock time at a place `offsetSeconds` east of UTC (e.g. -14400 for New York
+   in summer), regardless of where the viewer's own clock is. With no offset
+   it falls back to the viewer's local time. */
+export function formatClockAt(date, offsetSeconds) {
+  if (!Number.isFinite(offsetSeconds)) return formatClock(date)
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(date.getTime() + offsetSeconds * 1000))
+}
+
+/* Hour of day (0-23) at that place. */
+export function hourAt(date, offsetSeconds) {
+  if (!Number.isFinite(offsetSeconds)) return date.getHours()
+  return new Date(date.getTime() + offsetSeconds * 1000).getUTCHours()
+}
+
+/* True when the place's clock differs from the viewer's at that moment. */
+export function offsetDiffers(date, offsetSeconds) {
+  if (!Number.isFinite(offsetSeconds)) return false
+  return offsetSeconds !== -date.getTimezoneOffset() * 60
+}
