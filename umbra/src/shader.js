@@ -49,6 +49,8 @@ vec3 skyBase(vec3 rd){
   vec3 zen=mix(zenN,zenD,uDay), hor=mix(horN,horD,uDay);
   vec2 hs = normalize(uSun.xz+1e-5), hr = normalize(rd.xz+1e-5);
   float towardSun = pow(max(dot(hs,hr),0.),3.0);
+  float golden = (1.-smoothstep(0.08,0.6,uSun.y))*uDay;
+  hor = mix(hor, vec3(1.0,0.62,0.34), golden*0.75*(0.15+0.85*towardSun));
   hor = mix(hor, vec3(1.0,0.42,0.16), uTw*(0.25+0.75*towardSun));
   zen = mix(zen, vec3(0.20,0.18,0.42), uTw*0.45);
   float hz = pow(1.0-clamp(rd.y,0.,1.),3.2);
@@ -156,7 +158,7 @@ void main(){
     float ndl = max(dot(n,uL),0.);
     float vis = ndl>0. ? shadowRay(p+n*0.06,uL) : 0.;
     vec3 direct = uLCol*ndl*vis;
-    vec3 ambCol = mix(vec3(0.02,0.03,0.06),vec3(0.30,0.38,0.52),uDay);
+    vec3 ambCol = mix(vec3(0.02,0.03,0.06),vec3(0.13,0.18,0.28),uDay);
     ambCol = mix(ambCol, vec3(0.38,0.26,0.30), uTw*0.5);
     vec3 amb = ambCol*(0.55+0.45*n.y);
     vec3 alb = vec3(0.5);
@@ -170,7 +172,7 @@ void main(){
       wall = mix(wall,vec3(0.45,0.52,0.58),step(0.5,hh)*step(hh,0.72));
       wall = mix(wall,vec3(0.72,0.70,0.66),step(0.86,hh)*step(hh,0.95));
       if (n.y>0.5){
-        alb = vec3(0.30,0.30,0.32)*(0.8+0.4*hash12(floor(q/3.)));
+        alb = vec3(0.34,0.33,0.33)*(0.9+0.2*hash12(floor(q/9.)));
         vec2 f = fract(q/C); float e = min(min(f.x,1.-f.x),min(f.y,1.-f.y));
         alb *= 0.8+0.5*smoothstep(0.1,0.02,e);
         heatBase = 0.22;
@@ -248,14 +250,14 @@ void main(){
       vec4 r = texelFetch(uRoute,rt,0);
       float pulseS = smoothstep(0.55,1.0,fract(r.g*uLen.x/36.-uTime*0.9));
       float pulseC = smoothstep(0.55,1.0,fract(r.a*uLen.y/36.-uTime*0.9));
-      vec3 cS = vec3(1.0,0.50,0.16), cC = vec3(0.25,1.0,0.78);
-      col += cS*r.r*(0.55+1.4*pulseS)*0.8;
-      col = mix(col,col*0.5,r.b*0.5);
-      col += cC*r.b*(0.7+1.6*pulseC)*0.9;
+      vec3 cS = vec3(1.0,0.46,0.10), cC = vec3(0.12,1.0,0.72);
+      float ms = smoothstep(0.0,0.9,r.r), mc = smoothstep(0.0,0.9,r.b);
+      col = mix(col, cS*(0.9+1.1*pulseS), ms*0.92);
+      col = mix(col, cC*(1.0+1.4*pulseC), mc*0.96);
     }
     // thermal vision
     if (uThermal>0.5){
-      float heat = heatBase*0.7 + 0.14 + 0.78*ndl*vis*uSunStr*(heatBase*2.4+0.2) + 0.1*uDay;
+      float heat = heatBase*0.7 + 0.14 + 1.0*ndl*vis*uSunStr*(heatBase*2.4+0.25) + 0.1*uDay;
       if (water) heat = 0.06+0.05*uDay;
       if (mat==1 && n.y<0.5) heat = 0.12+0.5*ndl*vis*uSunStr;
       vec3 th = inferno(heat);
@@ -282,11 +284,11 @@ void main(){
     }
   }
   if (tDist>0.){
-    float f = 1.-exp(-tDist*0.00022);
+    float f = 1.-exp(-tDist*0.00009);
     if (!hit) f = clamp(f*1.4+0.2,0.,1.);
     col = mix(col, uThermal>0.5?vec3(0.04,0.0,0.08):fogCol, f);
   }
-  col = aces(col*1.05);
+  col = aces(col*0.9);
   col = pow(col,vec3(1./2.2));
   // gentle vignette
   vec2 vq = uv*0.5;

@@ -17,7 +17,7 @@ const state = {
   seed: Number(params.get('seed')) || 7,
   lat: params.has('lat') ? Number(params.get('lat')) : PLACES[3].lat,
   day: Number(params.get('day')) || 172,
-  hour: params.has('t') ? Number(params.get('t')) : 13,
+  hour: params.has('t') ? Number(params.get('t')) : 17,
   lambda: params.has('seek') ? Number(params.get('seek')) : 4,
   thermal: params.get('thermal') === '1',
   playing: false,
@@ -89,7 +89,7 @@ function uploadCity() {
 }
 
 // ---------------------------------------------------------------- camera
-const cam = { az: 0.62, el: 0.62, dist: 1250, tx: W * 0.5, tz: W * 0.5 }
+const cam = { az: params.has('az') ? Number(params.get('az')) : 0.15, el: params.has('el') ? Number(params.get('el')) : 0.52, dist: params.has('dist') ? Number(params.get('dist')) : innerWidth < 700 ? 1900 : 980, tx: W * 0.5 - (innerWidth > 900 ? 150 : 0), tz: W * 0.5 }
 const FOV_TAN = Math.tan((38 * Math.PI) / 360)
 let basis = null
 function updateCamera() {
@@ -179,7 +179,7 @@ function rasterRoute(pts, chan, totalLen) {
       let u = ((wx - x0) * vx + (wz - z0) * vz) / vv
       u = Math.max(0, Math.min(1, u))
       const d = Math.hypot(wx - (x0 + vx * u), wz - (z0 + vz * u))
-      const m = Math.max(0, Math.min(1, 1.5 - d / 1.45)) // ~3 m wide ribbon with soft edge
+      const m = Math.max(0, Math.min(1, 1.6 - d / 1.9)) // ~3 m wide ribbon with soft edge
       if (m <= 0) continue
       const o = (tz * RT + tx) * 4
       const v = Math.round(m * 255)
@@ -344,10 +344,10 @@ function sunUniforms() {
   const sunI = smoothstep(0.0, 0.12, e)
   const moonDir = [-sp.dir[0], -sp.dir[1], -sp.dir[2]]
   const moonI = smoothstep(0.0, 0.2, -e) * 0.26 * (1 - sunI)
-  const warm = smoothstep(0.0, 0.35, e)
+  const warm = smoothstep(0.0, 0.62, e)
   const sc = [1.0, 0.42 + 0.52 * warm, 0.18 + 0.7 * warm]
   let L, col
-  if (e > 0) { L = sp.dir; col = sc.map((v) => v * 3.4 * sunI) }
+  if (e > 0) { L = sp.dir; col = sc.map((v) => v * 3.3 * sunI) }
   else { L = moonDir; col = [0.45 * moonI * 3.2, 0.58 * moonI * 3.2, 1.0 * moonI * 3.2] }
   sunNow = { sp, day, tw, L, col, str: Math.min(1, Math.max(0, e * 2.2)) }
 }
@@ -519,8 +519,8 @@ function panBy(dx, dy) {
   const k = cam.dist * 0.0014
   const rx = Math.cos(cam.az), rz = -Math.sin(cam.az)
   const fx = -Math.sin(cam.az), fz = -Math.cos(cam.az)
-  cam.tx = Math.max(0, Math.min(W, cam.tx - dx * k * rx - dy * k * fx * -1 * -1))
-  cam.tz = Math.max(0, Math.min(W, cam.tz - dx * k * rz - dy * k * fz * -1 * -1))
+  cam.tx = Math.max(0, Math.min(W, cam.tx - dx * k * rx + dy * k * fx))
+  cam.tz = Math.max(0, Math.min(W, cam.tz - dx * k * rz + dy * k * fz))
 }
 function randomPairDefault() {
   state.A = snapWalkable(city, Math.floor(0.12 * N), Math.floor(0.82 * N))
