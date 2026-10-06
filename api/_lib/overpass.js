@@ -88,12 +88,19 @@ function snapBbox(b) {
 }
 
 async function runQuery(q) {
-  let lastErr
+  const failures = []
   for (const url of ENDPOINTS) {
+    const host = new URL(url).host
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          // Overpass's usage policy asks clients to identify themselves, and
+          // some instances turn away anonymous default-agent traffic.
+          'user-agent': 'shade-map/1.0 (+https://github.com/mmodell/shade-map)',
+          accept: 'application/json',
+        },
         body: 'data=' + encodeURIComponent(q),
         // A slow-but-working mirror can legitimately take several seconds
         // for a complex query, but 26s before even trying the next mirror
@@ -101,13 +108,15 @@ async function runQuery(q) {
         // could stall an entire search for the better part of a minute.
         signal: AbortSignal.timeout(12000),
       })
-      if (!res.ok) throw new Error(`overpass ${res.status}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return await res.json()
     } catch (err) {
-      lastErr = err
+      const why = err?.name === 'TimeoutError' ? 'timed out' : String(err?.message || err)
+      failures.push(`${host}: ${why}`)
     }
   }
-  throw lastErr || new Error('overpass unavailable')
+  // Say *why* — "unavailable" alone is impossible to diagnose from a screenshot.
+  throw new Error(`overpass unavailable (${failures.join('; ')})`)
 }
 
 function parseBase(json) {

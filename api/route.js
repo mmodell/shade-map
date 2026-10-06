@@ -10,6 +10,7 @@ import { getStateCrimeContext } from './_lib/crimeService.js'
 const MAX_ROUTES = 4
 const CURVE_CLOUD_GAP_MS = 4 * 60 * 60 * 1000 // forecast steps are ~3h apart
 const EMPTY_OSM = { greenAreas: [], greenLines: [], trees: [], highways: [], buildings: [] }
+const MAX_ERR_CHARS = 160
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -56,10 +57,11 @@ export default async function handler(req, res) {
     allPoints.length
       ? fetchOsmFeatures(allPoints)
           .then((osm) => ({ osm, ok: true }))
-          .catch(() => ({ osm: EMPTY_OSM, ok: false }))
+          .catch((err) => ({ osm: EMPTY_OSM, ok: false, error: String(err?.message || err).slice(0, MAX_ERR_CHARS) }))
       : Promise.resolve({ osm: EMPTY_OSM, ok: false }),
   ])
-  const { osm, ok: osmOk } = osmResult
+  const { osm, ok: osmOk, error: osmError } = osmResult
+  if (!osmOk && osmError) console.warn('[route] OSM fetch failed:', osmError)
   const cloudsPct = nearestCloudsPct(weather, date)
 
   const analyzed = routes.map(({ id, points, durationSeconds }) => {
@@ -72,7 +74,7 @@ export default async function handler(req, res) {
     const shadeCtx = prepareShade({ points, osm })
     const shade = evaluateShade(shadeCtx, { date, durationSeconds, cloudsPct })
     if (!osmOk) {
-      shade.note = 'Map data was unavailable — shade estimated from sun angle only.'
+      shade.note = `Map data was unavailable${osmError ? ` (${osmError})` : ''} — shade estimated from sun angle only.`
       shade.greenCoverage = null
     } else {
       if (osm.buildingsOk === false) {

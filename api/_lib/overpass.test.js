@@ -111,3 +111,19 @@ describe('fetchOsmFeatures building footprints', () => {
     await expect(fetchOsmFeatures([{ lat: base, lng: base }])).rejects.toThrow()
   })
 })
+
+describe('fetchOsmFeatures failure reporting', () => {
+  it('names each mirror and why it failed, and identifies itself with a User-Agent', async () => {
+    const seen = []
+    vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
+      seen.push(opts.headers['user-agent'])
+      return { ok: false, status: String(url).includes('kumi') ? 429 : 406, json: async () => ({}) }
+    }))
+    const base = 80 + Math.random() * 5
+    await expect(fetchOsmFeatures([{ lat: base, lng: base }])).rejects.toThrow(
+      /overpass-api\.de: HTTP 406.*overpass\.kumi\.systems: HTTP 429/
+    )
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((ua) => /shade-map/.test(ua))).toBe(true)
+  })
+})
