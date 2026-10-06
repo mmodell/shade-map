@@ -115,7 +115,7 @@ export default function ShadeFlipChart({ routes, selectedId, departure, onScrub,
 
       <p className="flip__msg">
         {!best ? (
-          'It’s dark for this whole window — shade isn’t a factor.'
+          'The sun is too low (or it’s dark) for shade to matter in this window.'
         ) : !varies ? (
           'Leaving earlier or later won’t change much on this route.'
         ) : bestIsNow ? (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bestDeparture, spread, nearestSample, shadeAt, curveOf } from './shadeCurve.js'
+import { bestDeparture, spread, nearestSample, shadeAt, curveOf, sunMatters } from './shadeCurve.js'
 
 const S = (iso, shadeFraction, isNight = false) => ({ t: iso, shadeFraction, isNight })
 const samples = [
@@ -43,5 +43,25 @@ describe('spread / lookup', () => {
     expect(curveOf(null)).toEqual([])
     expect(curveOf({ shade: {} })).toEqual([])
     expect(curveOf({ shade: { byDeparture: samples } })).toHaveLength(6)
+  })
+})
+
+describe('low sun is not a recommendation', () => {
+  const lowSun = [
+    { t: '2026-10-06T11:00:00Z', shadeFraction: 1, isNight: false, sunAltitude: 2 }, // just after sunrise
+    { t: '2026-10-06T14:00:00Z', shadeFraction: 0.4, isNight: false, sunAltitude: 30 },
+    { t: '2026-10-06T16:00:00Z', shadeFraction: 0.7, isNight: false, sunAltitude: 43 },
+    { t: '2026-10-06T22:00:00Z', shadeFraction: 1, isNight: false, sunAltitude: 3 }, // just before sunset
+  ]
+  it('ignores dawn/dusk samples when picking the best time and the spread', () => {
+    expect(bestDeparture(lowSun).t).toBe('2026-10-06T16:00:00Z')
+    expect(spread(lowSun)).toBeCloseTo(0.3)
+  })
+  it('returns null when the sun never gets high enough to matter', () => {
+    expect(bestDeparture(lowSun.filter((s) => s.sunAltitude < 10))).toBeNull()
+  })
+  it('treats samples with no altitude as useful, and night as not', () => {
+    expect(sunMatters({ t: 'x', shadeFraction: 0.5, isNight: false })).toBe(true)
+    expect(sunMatters({ t: 'x', shadeFraction: 1, isNight: true, sunAltitude: 40 })).toBe(false)
   })
 })
