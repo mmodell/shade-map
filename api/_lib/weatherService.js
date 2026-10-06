@@ -42,6 +42,13 @@ export async function getWeather({ lat, lng, units }) {
       provider: 'openweather',
       units: u,
       location: { lat, lng, name: forecast?.city?.name || current?.name || null },
+      // Seconds east of UTC at the location (includes DST) — lets the UI show
+      // the route's local clock time even when the viewer is elsewhere.
+      utcOffsetSeconds: Number.isFinite(current?.timezone)
+        ? current.timezone
+        : Number.isFinite(forecast?.city?.timezone)
+          ? forecast.city.timezone
+          : null,
       points,
     }
   })

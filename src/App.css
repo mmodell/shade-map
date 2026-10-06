@@ -1470,3 +1470,7 @@
   opacity: 0.5;
   cursor: default;
 }
+.flip__tz {
+  font-size: 11px;
+  color: var(--text-dim);
+}

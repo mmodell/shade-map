@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { rankColor } from '../lib/ranking'
-import { formatClock, formatPercent } from '../lib/format'
+import { formatClockAt, formatPercent, hourAt, offsetDiffers } from '../lib/format'
 import { bestDeparture, curveOf, nearestSample, shadeAt, spread } from '../lib/shadeCurve'
 
 const W = 320
@@ -11,7 +11,8 @@ const PAD = { l: 26, r: 8, t: 8, b: 18 }
    time of the day, so you can see the moments the shady option flips (a
    street that's cool at 10am is baking at 3pm). Tap the chart to leave then:
    the same routes are re-analyzed for that time, no new search needed. */
-export default function ShadeFlipChart({ routes, selectedId, departure, onScrub, busy }) {
+export default function ShadeFlipChart({ routes, selectedId, departure, onScrub, busy, utcOffsetSeconds = null, placeName = null }) {
+  const at = (d) => formatClockAt(d, utcOffsetSeconds)
   const series = useMemo(
     () =>
       routes
@@ -59,14 +60,19 @@ export default function ShadeFlipChart({ routes, selectedId, departure, onScrub,
   const hours = []
   for (let t = Math.ceil(t0 / 3600e3) * 3600e3; t <= t1; t += 3600e3) {
     const h = new Date(t)
-    if (h.getHours() % 3 === 0) hours.push(h)
+    if (hourAt(h, utcOffsetSeconds) % 3 === 0) hours.push(h)
   }
+  const remoteClock = offsetDiffers(departure, utcOffsetSeconds)
 
   return (
     <section className="flip" aria-label="Shade by departure time">
       <div className="flip__head">
         <span className="flip__title">Shade by departure time</span>
-        {busy && <span className="flip__busy">updating…</span>}
+        {busy ? (
+          <span className="flip__busy">updating…</span>
+        ) : (
+          remoteClock && <span className="flip__tz">{placeName ? `${placeName} time` : 'route’s local time'}</span>
+        )}
       </div>
 
       <svg
@@ -89,7 +95,7 @@ export default function ShadeFlipChart({ routes, selectedId, departure, onScrub,
         ))}
         {hours.map((h) => (
           <text key={h.getTime()} x={x(h.getTime())} y={H - 4} className="flip__axis" textAnchor="middle">
-            {formatClock(h).replace(':00', '')}
+            {at(h).replace(':00', '')}
           </text>
         ))}
 
@@ -124,9 +130,9 @@ export default function ShadeFlipChart({ routes, selectedId, departure, onScrub,
           </>
         ) : (
           <>
-            Shadiest at <strong>{formatClock(new Date(best.t))}</strong> —{' '}
+            Shadiest at <strong>{at(new Date(best.t))}</strong> —{' '}
             <strong>{formatPercent(best.shadeFraction)}</strong> shade
-            {now != null && <> vs {formatPercent(now)} at {formatClock(departure)}</>}
+            {now != null && <> vs {formatPercent(now)} at {at(departure)}</>}
             {best.overcast ? ' (overcast then)' : ''}.{' '}
             <button type="button" className="flip__go" disabled={busy} onClick={() => onScrub(new Date(best.t))}>
               Leave then

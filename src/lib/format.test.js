@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { formatDistance, formatDuration, formatPercent, formatTemp } from './format.js'
+import {
+  formatDistance,
+  formatDuration,
+  formatPercent,
+  formatTemp,
+  formatClockAt,
+  hourAt,
+  offsetDiffers,
+} from './format.js'
 
 describe('formatDistance', () => {
   it('shows feet under ~0.1 miles', () => {
@@ -47,5 +55,27 @@ describe('formatTemp', () => {
   })
   it('handles null gracefully', () => {
     expect(formatTemp(null, 'imperial')).toBe('—')
+  })
+})
+
+describe('route-local clock', () => {
+  const noonUtc = new Date('2026-10-06T16:00:00Z')
+  it('shows the clock at the place, not the viewer', () => {
+    expect(formatClockAt(noonUtc, -4 * 3600)).toBe('12:00 PM') // New York (EDT)
+    expect(formatClockAt(noonUtc, -7 * 3600)).toBe('9:00 AM') // Los Angeles (PDT)
+    expect(formatClockAt(new Date('2026-10-06T21:30:00Z'), 9 * 3600)).toBe('6:30 AM') // Tokyo, next day
+  })
+  it('hourAt follows the place', () => {
+    expect(hourAt(noonUtc, -4 * 3600)).toBe(12)
+    expect(hourAt(noonUtc, 5.5 * 3600)).toBe(21)
+  })
+  it('falls back to the viewer when the offset is unknown', () => {
+    expect(hourAt(noonUtc, null)).toBe(noonUtc.getHours())
+    expect(offsetDiffers(noonUtc, null)).toBe(false)
+  })
+  it('knows when the place and viewer clocks differ', () => {
+    const viewer = -noonUtc.getTimezoneOffset() * 60
+    expect(offsetDiffers(noonUtc, viewer)).toBe(false)
+    expect(offsetDiffers(noonUtc, viewer + 3 * 3600)).toBe(true)
   })
 })

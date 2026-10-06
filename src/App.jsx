@@ -406,6 +406,8 @@ export default function App() {
                     departure={resolvedDeparture}
                     onScrub={scrubDeparture}
                     busy={scrubbing}
+                    utcOffsetSeconds={meta.weather?.utcOffsetSeconds ?? null}
+                    placeName={meta.weather?.location?.name ?? null}
                   />
                   {selected && !navigating && (
                     <button
