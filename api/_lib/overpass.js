@@ -34,6 +34,14 @@ export async function fetchOsmFeatures(points) {
   const b = snapBbox(bbox(points, 70))
   const box = `${b.south},${b.west},${b.north},${b.east}`
 
+  // A trip this long can't be answered by a public Overpass mirror (it would
+  // just time out on every one) — say so immediately instead of burning the
+  // whole time budget finding out.
+  const spanKm = bboxSpanKm(b)
+  if (spanKm > MAX_SPAN_KM) {
+    throw new Error(`route spans about ${Math.round(spanKm)} km — too long for detailed map data`)
+  }
+
   // Two independent requests. The greenery/footpath layer is what the app
   // has always relied on; building outlines are the heavy, optional upgrade.
   // Keeping them apart means a slow or failed building download can never
@@ -60,6 +68,18 @@ out geom tags;`
 // we ask for just a centre point + height per building — the older, much
 // lighter query — and shadows fall back to the directional-cone model.
 const MAX_FOOTPRINT_AREA_KM2 = 5
+// Beyond this the greenery query alone is hopeless on public mirrors.
+export const MAX_SPAN_KM = 60
+// Total time we'll spend across all mirrors for one query — comfortably
+// inside the serverless function's 30s limit (3 x 12s used to exceed it).
+const QUERY_BUDGET_MS = 24000
+
+function bboxSpanKm(b) {
+  const midLat = ((b.north + b.south) / 2) * (Math.PI / 180)
+  const h = (b.north - b.south) * 111.32
+  const w = (b.east - b.west) * 111.32 * Math.cos(midLat)
+  return Math.max(h, w)
+}
 
 function bboxAreaKm2(b) {
   const midLat = ((b.north + b.south) / 2) * (Math.PI / 180)
@@ -89,8 +109,14 @@ function snapBbox(b) {
 
 async function runQuery(q) {
   const failures = []
+  const deadline = Date.now() + QUERY_BUDGET_MS
   for (const url of ENDPOINTS) {
     const host = new URL(url).host
+    const left = deadline - Date.now()
+    if (left < 1500) {
+      failures.push(`${host}: skipped (out of time)`)
+      continue
+    }
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -106,7 +132,7 @@ async function runQuery(q) {
         // for a complex query, but 26s before even trying the next mirror
         // (of 3, tried one at a time) meant one degraded/unreachable mirror
         // could stall an entire search for the better part of a minute.
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(Math.min(12000, left)),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return await res.json()

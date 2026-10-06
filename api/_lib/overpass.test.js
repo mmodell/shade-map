@@ -127,3 +127,21 @@ describe('fetchOsmFeatures failure reporting', () => {
     expect(seen.every((ua) => /shade-map/.test(ua))).toBe(true)
   })
 })
+
+describe('fetchOsmFeatures guardrails', () => {
+  it('refuses an absurdly long route right away without calling Overpass', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const far = [{ lat: 34, lng: -118 }, { lat: 40.7, lng: -74 }] // LA to New York
+    await expect(fetchOsmFeatures(far)).rejects.toThrow(/too long for detailed map data/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('still handles a long-but-plausible drive (~25 km)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ elements: [] }) })))
+    const base = 20 + Math.random() * 5
+    await expect(
+      fetchOsmFeatures([{ lat: base, lng: base }, { lat: base + 0.2, lng: base + 0.1 }])
+    ).resolves.toBeTruthy()
+  })
+})
