@@ -257,7 +257,7 @@ void main(){
     }
     // thermal vision
     if (uThermal>0.5){
-      float heat = heatBase*0.7 + 0.14 + 1.0*ndl*vis*uSunStr*(heatBase*2.4+0.25) + 0.1*uDay;
+      float heat = heatBase*0.7 + 0.14 + 0.38*ndl*vis*uSunStr*(heatBase*2.4+0.2) + 0.1*uDay;
       if (water) heat = 0.06+0.05*uDay;
       if (mat==1 && n.y<0.5) heat = 0.12+0.5*ndl*vis*uSunStr;
       vec3 th = inferno(heat);

@@ -9,6 +9,8 @@ for the time you're actually leaving — then open it on your phone from anywher
 - **Install:** it's a PWA — "Add to Home Screen" and it behaves like an app
 - **Cost:** $0 (Google Maps free tier + OpenWeather free tier + Vercel Hobby)
 
+> **Also in this repo:** [`umbra/`](umbra/README.md) — a keyless, build-free 3D sandbox of the same idea: a procedural city lit by the real sun with ray-traced shadows and a shade-seeking router.
+
 ---
 
 ## 1. Prerequisites
