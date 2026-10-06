@@ -75,6 +75,10 @@ export default async function handler(req, res) {
       shade.note = 'Map data was unavailable — shade estimated from sun angle only.'
       shade.greenCoverage = null
     } else {
+      if (osm.buildingsOk === false) {
+        shade.note =
+          shade.note || 'Building outlines were unavailable — shade counts parks and trees only.'
+      }
       // Same route, every departure time of the day: the "when should I
       // leave" curve. Reuses the prepared geometry, so it's cheap.
       shade.byDeparture = shadeCurve(shadeCtx, {

@@ -34,20 +34,47 @@ export async function fetchOsmFeatures(points) {
   const b = snapBbox(bbox(points, 70))
   const box = `${b.south},${b.west},${b.north},${b.east}`
 
-  return cached(`osm:${box}`, OSM_TTL_MS, async () => {
-    const q = `[out:json][timeout:25];
+  // Two independent requests. The greenery/footpath layer is what the app
+  // has always relied on; building outlines are the heavy, optional upgrade.
+  // Keeping them apart means a slow or failed building download can never
+  // take the parks, trees and sidewalks down with it.
+  const [base, buildings] = await Promise.all([
+    cached(`osm:${box}`, OSM_TTL_MS, async () => {
+      const q = `[out:json][timeout:25];
 (
   ${GREEN_AREA_QUERY.map((s) => `${s}(${box});`).join('\n  ')}
   ${GREEN_LINE_QUERY.map((s) => `${s}(${box});`).join('\n  ')}
   node["natural"="tree"](${box});
   ${HIGHWAY_QUERY}(${box});
 );
-out geom tags;
-way["building"](${box});
 out geom tags;`
+      return parseBase(await runQuery(q))
+    }),
+    fetchBuildings(b, box).catch(() => null),
+  ])
+  return { ...base, buildings: buildings ?? [], buildingsOk: buildings != null }
+}
 
-    const json = await runQuery(q)
-    return parse(json)
+// Full outlines for every building in a box get very large very fast (a
+// 7-mile drive across a dense city is tens of megabytes), so past this area
+// we ask for just a centre point + height per building — the older, much
+// lighter query — and shadows fall back to the directional-cone model.
+const MAX_FOOTPRINT_AREA_KM2 = 5
+
+function bboxAreaKm2(b) {
+  const midLat = ((b.north + b.south) / 2) * (Math.PI / 180)
+  const h = (b.north - b.south) * 111.32
+  const w = (b.east - b.west) * 111.32 * Math.cos(midLat)
+  return h * w
+}
+
+function fetchBuildings(b, box) {
+  const footprints = bboxAreaKm2(b) <= MAX_FOOTPRINT_AREA_KM2
+  return cached(`bld:${footprints ? 'geom' : 'ctr'}:${box}`, OSM_TTL_MS, async () => {
+    const q = `[out:json][timeout:25];
+way["building"](${box});
+out ${footprints ? 'geom tags' : 'tags center'};`
+    return parseBuildings(await runQuery(q))
   })
 }
 
@@ -83,34 +110,14 @@ async function runQuery(q) {
   throw lastErr || new Error('overpass unavailable')
 }
 
-function parse(json) {
+function parseBase(json) {
   const greenAreas = []
   const greenLines = []
   const trees = []
   const highways = []
-  const buildings = []
 
   for (const el of json.elements || []) {
     const tags = el.tags || {}
-    // Buildings come back with their full footprint so shadows can be
-    // ray-cast against the real outline (a long slab shades very differently
-    // from a point), plus height/building:levels for how far it reaches.
-    // A bare centre point (older cached data) still works as a fallback.
-    if (el.type === 'way' && tags.building) {
-      if (el.geometry && el.geometry.length >= 3) {
-        const ring = el.geometry.map((g) => [g.lat, g.lon])
-        let sLat = 0
-        let sLng = 0
-        for (const [la, ln] of ring) {
-          sLat += la
-          sLng += ln
-        }
-        buildings.push({ lat: sLat / ring.length, lng: sLng / ring.length, heightM: buildingHeightMeters(tags), ring })
-      } else if (el.center) {
-        buildings.push({ lat: el.center.lat, lng: el.center.lon, heightM: buildingHeightMeters(tags) })
-      }
-      continue
-    }
     if (el.type === 'node' && tags.natural === 'tree') {
       trees.push({ lat: el.lat, lng: el.lon })
       continue
@@ -127,7 +134,31 @@ function parse(json) {
     }
   }
 
-  return { greenAreas, greenLines, trees, highways, buildings }
+  return { greenAreas, greenLines, trees, highways }
+}
+
+// Buildings arrive either with their full outline (small areas) or as a bare
+// centre point (large areas) — both are handled, with height/building:levels
+// for how far each shadow reaches.
+function parseBuildings(json) {
+  const buildings = []
+  for (const el of json.elements || []) {
+    const tags = el.tags || {}
+    if (el.type !== 'way' || !tags.building) continue
+    if (el.geometry && el.geometry.length >= 3) {
+      const ring = el.geometry.map((g) => [g.lat, g.lon])
+      let sLat = 0
+      let sLng = 0
+      for (const [la, ln] of ring) {
+        sLat += la
+        sLng += ln
+      }
+      buildings.push({ lat: sLat / ring.length, lng: sLng / ring.length, heightM: buildingHeightMeters(tags), ring })
+    } else if (el.center) {
+      buildings.push({ lat: el.center.lat, lng: el.center.lon, heightM: buildingHeightMeters(tags) })
+    }
+  }
+  return buildings
 }
 
 const DEFAULT_BUILDING_HEIGHT_M = 12 // ~4 stories — used when OSM has no height/levels tag
